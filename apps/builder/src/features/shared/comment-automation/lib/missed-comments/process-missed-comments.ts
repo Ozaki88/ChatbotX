@@ -176,7 +176,9 @@ async function scanAutomationComments(props: {
   let scannedAny = postIds.length === 0
   for (const recentPostId of postIds) {
     try {
-      comments.push(...(await scanPostComments({ ...rest, postId: recentPostId })))
+      comments.push(
+        ...(await scanPostComments({ ...rest, postId: recentPostId })),
+      )
       scannedAny = true
     } catch (error) {
       lastError = error

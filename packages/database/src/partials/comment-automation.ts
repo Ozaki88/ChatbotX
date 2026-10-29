@@ -156,7 +156,9 @@ export function canProcessMissedComments(
 
 /** An automation watching every post (not a fixed list, not live videos). */
 export function isEveryPostTarget(post: Pick<CommentPost, "type">): boolean {
-  return post.type === "all" || post.type === "published" || post.type === "reels"
+  return (
+    post.type === "all" || post.type === "published" || post.type === "reels"
+  )
 }
 
 function canListRecentPosts(type?: CommentAutomationType): boolean {
