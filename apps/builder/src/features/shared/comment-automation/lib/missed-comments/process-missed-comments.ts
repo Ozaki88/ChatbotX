@@ -140,6 +140,17 @@ export async function processMissedComments(props: {
       )
     }
 
+    logger.info(
+      {
+        automationId: automation.id,
+        postId,
+        scanned: comments.length,
+        pending: pending.length,
+        failed,
+      },
+      "Process missed comments: run finished",
+    )
+
     return {
       status: "done",
       scanned: comments.length,
@@ -171,6 +182,10 @@ async function scanAutomationComments(props: {
   }
 
   const postIds = await listRecentPostIds(rest)
+  logger.info(
+    { type: rest.type, posts: postIds.length, postIds },
+    "Process missed comments: scanning recent posts",
+  )
   const comments: ScannedComment[] = []
   let lastError: unknown
   let scannedAny = postIds.length === 0
