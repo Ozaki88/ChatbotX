@@ -48,7 +48,7 @@ const buildDefaults = (helpItems: TenantHelpItemModel[]): TenantSettings => {
     appUrl: derived.appUrl,
     publicRealtimeUrl: derived.publicRealtimeUrl,
     storageUrl: derived.storageUrl,
-    name: "ChatbotX",
+    name: "Freya Sage",
     logoLightUrl: `${derived.appUrl}/brand/logo_white.svg`,
     logoDarkUrl: `${derived.appUrl}/brand/logo_black.svg`,
     faviconUrl: `${derived.appUrl}/brand/icon_black.svg`,
