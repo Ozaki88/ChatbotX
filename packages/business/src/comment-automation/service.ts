@@ -589,6 +589,10 @@ class CommentAutomationService extends BaseService {
           and(
             eq(commentAutomationMissModel.automationId, props.automationId),
             inArray(commentAutomationMissModel.commentId, props.commentIds),
+            // A run only scans posts the automation watches, so a
+            // `postNotMatched` miss there was a misjudged post (a reel taken
+            // for a live video) — retry it rather than count it as handled.
+            ne(commentAutomationMissModel.reason, "postNotMatched"),
           ),
         ),
     ])
