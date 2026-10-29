@@ -657,6 +657,9 @@ function PostsTable({ rows }: { rows: FreyaStats["posts"] }) {
                     alt=""
                     className="size-10 shrink-0 rounded-md object-cover"
                     height={40}
+                    loading="lazy"
+                    // Meta's CDNs refuse hotlinked images that send a referrer.
+                    referrerPolicy="no-referrer"
                     src={r.thumbnail}
                     width={40}
                   />
