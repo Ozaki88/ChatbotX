@@ -87,10 +87,10 @@ function missesWhere(filter: FreyaStatsFilter): SQL {
 function allCommentsCte(filter: FreyaStatsFilter): SQL {
   return sql`
     WITH comments AS (
-      SELECT e."commentId", e."postId", e."commentText", e."occurredAt", true AS answered
+      SELECT e."commentId", e."postId", e."commentText", e."occurredAt", a."type", true AS answered
       ${eventsWhere(filter)}
       UNION ALL
-      SELECT m."commentId", m."postId", m."commentText", m."occurredAt", false AS answered
+      SELECT m."commentId", m."postId", m."commentText", m."occurredAt", a."type", false AS answered
       ${missesWhere(filter)}
     ),
     distinct_comments AS (
@@ -98,6 +98,7 @@ function allCommentsCte(filter: FreyaStatsFilter): SQL {
         MIN("postId") AS "postId",
         MIN("commentText") AS "commentText",
         MIN("occurredAt") AS "occurredAt",
+        MIN("type") AS "type",
         BOOL_OR(answered) AS answered
       FROM comments
       GROUP BY "commentId"
@@ -139,6 +140,9 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
     weekdays,
     inbox,
     feed,
+    links,
+    linkTotals,
+    linkDaily,
   ] = await Promise.all([
     run(
       "totals",
@@ -197,6 +201,10 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
         SELECT TO_CHAR((m."occurredAt" AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
           COUNT(DISTINCT m."commentId") AS "missedComments"
         ${missesWhere(filter)}
+          AND NOT EXISTS (
+            SELECT 1 FROM "CommentAutomationEvent" ex
+            WHERE ex."workspaceId" = m."workspaceId" AND ex."commentId" = m."commentId"
+          )
         GROUP BY 1
       )
       SELECT COALESCE(d.day, mi.day) AS day,
@@ -230,23 +238,32 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       "posts",
       sql`
       ${allCommentsCte(filter)},
-      ev AS (SELECT e.* ${eventsWhere(filter)})
-      SELECT c."postId",
-        MIN(a_type.type) AS "type",
-        COUNT(*) AS "comments",
-        COUNT(*) FILTER (WHERE c.answered) AS "answered",
-        (SELECT COUNT(*) FROM ev WHERE ev."postId" = c."postId" AND ev."replyChannel" = 'private' AND ev."status" = 'sent') AS "dmSent",
-        (SELECT COUNT(*) FROM ev WHERE ev."postId" = c."postId" AND ev."clickedAt" IS NOT NULL) AS "tapped",
-        MAX(c."occurredAt") AS "lastComment"
-      FROM distinct_comments c
+      ev AS (SELECT e.* ${eventsWhere(filter)}),
+      per_post AS (
+        SELECT c."postId", MIN(c."type") AS "type",
+          COUNT(*) AS "comments",
+          COUNT(*) FILTER (WHERE c.answered) AS "answered",
+          MAX(c."occurredAt") AS "lastComment"
+        FROM distinct_comments c
+        GROUP BY c."postId"
+        ORDER BY "comments" DESC
+        LIMIT 25
+      )
+      SELECT p.*,
+        (SELECT COUNT(*) FROM ev WHERE ev."postId" = p."postId" AND ev."replyChannel" = 'private' AND ev."status" = 'sent') AS "dmSent",
+        (SELECT COUNT(*) FROM ev WHERE ev."postId" = p."postId" AND ev."clickedAt" IS NOT NULL) AS "tapped",
+        cp."caption", cp."thumbnail", cp."permalink"
+      FROM per_post p
       LEFT JOIN LATERAL (
-        SELECT a."type" FROM "CommentAutomationEvent" e2
-        JOIN "CommentAutomation" a ON a."id" = e2."automationId"
-        WHERE e2."postId" = c."postId" LIMIT 1
-      ) a_type ON true
-      GROUP BY c."postId"
-      ORDER BY "comments" DESC
-      LIMIT 25`,
+        -- Facebook comments name the post "{pageId}_{storyId}"; the stored post
+        -- may use either form, so match both ways.
+        SELECT "caption", "thumbnail", "permalink" FROM "ChannelPost"
+        WHERE "workspaceId" = ${filter.workspaceId}
+          AND ("externalPostId" IN (p."postId", SPLIT_PART(p."postId", '_', 2))
+            OR p."postId" = SPLIT_PART("externalPostId", '_', 2))
+        LIMIT 1
+      ) cp ON true
+      ORDER BY p."comments" DESC`,
     ),
     run(
       "comment texts",
@@ -266,6 +283,10 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       sql`
       SELECT m."reason", COUNT(DISTINCT m."commentId") AS "count"
       ${missesWhere(filter)}
+          AND NOT EXISTS (
+            SELECT 1 FROM "CommentAutomationEvent" ex
+            WHERE ex."workspaceId" = m."workspaceId" AND ex."commentId" = m."commentId"
+          )
       GROUP BY m."reason"
       ORDER BY "count" DESC`,
     ),
@@ -315,9 +336,39 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
         LEFT(e."errorDetail", 160) AS "errorDetail",
         a."name" AS "automation", a."type",
         c."fullName" AS "contactName", c."id" AS "contactId"
-      ${eventsWhere(filter)}
+      FROM "CommentAutomationEvent" e
+      JOIN "CommentAutomation" a ON a."id" = e."automationId"
+      LEFT JOIN "Contact" c ON c."id" = e."contactId"
+      WHERE e."workspaceId" = ${filter.workspaceId}
+        AND e."occurredAt" >= ${from}${channelClause(filter.channel)}
       ORDER BY e."occurredAt" DESC
       LIMIT 60`,
+    ),
+    run(
+      "link clicks",
+      sql`
+      SELECT ml."name", ml."url", COUNT(*) AS "clicks", COUNT(DISTINCT s."contactId") AS "people",
+        MAX(s."occurredAt") AS "last"
+      FROM "MagicLinkStat" s
+      JOIN "MagicLink" ml ON ml."id" = s."linkId"
+      WHERE s."workspaceId" = ${filter.workspaceId} AND s."occurredAt" >= ${from}
+      GROUP BY ml."name", ml."url"
+      ORDER BY "clicks" DESC`,
+    ),
+    run(
+      "link totals",
+      sql`
+      SELECT COUNT(*) AS "clicks", COUNT(DISTINCT "contactId") AS "people"
+      FROM "MagicLinkStat"
+      WHERE "workspaceId" = ${filter.workspaceId} AND "occurredAt" >= ${from}`,
+    ),
+    run(
+      "link clicks by day",
+      sql`
+      SELECT TO_CHAR(("occurredAt" AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day, COUNT(*) AS "clicks"
+      FROM "MagicLinkStat"
+      WHERE "workspaceId" = ${filter.workspaceId} AND "occurredAt" >= ${from}
+      GROUP BY 1`,
     ),
   ])
 
@@ -339,6 +390,8 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       publicReplies: num(t.publicReplies),
       peopleReached: num(t.peopleReached),
       tappedTag: num(tapped[0]?.count),
+      linkClicks: num(linkTotals[0]?.clicks),
+      linkPeople: num(linkTotals[0]?.people),
       newContacts: num(newContacts[0]?.count),
     },
     daily: daily.map((r) => ({
@@ -350,6 +403,14 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       dmSeen: num(r.dmSeen),
       tapped: num(r.tapped),
       failed: num(r.failed),
+      linkClicks: num(linkDaily.find((l) => l.day === r.day)?.clicks),
+    })),
+    links: links.map((r) => ({
+      name: String(r.name),
+      url: String(r.url),
+      clicks: num(r.clicks),
+      people: num(r.people),
+      last: r.last ? new Date(String(r.last)) : null,
     })),
     automations: automations.map((r) => ({
       id: String(r.id),
@@ -371,6 +432,9 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       answered: num(r.answered),
       dmSent: num(r.dmSent),
       tapped: num(r.tapped),
+      caption: r.caption ? String(r.caption) : null,
+      thumbnail: r.thumbnail ? String(r.thumbnail) : null,
+      permalink: r.permalink ? String(r.permalink) : null,
       lastComment: r.lastComment ? new Date(String(r.lastComment)) : null,
     })),
     words: words.map((r) => ({

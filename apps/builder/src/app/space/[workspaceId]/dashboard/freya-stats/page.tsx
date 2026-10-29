@@ -18,21 +18,22 @@ import { getCurrentUserAndTargetWorkspace } from "@/lib/auth/utils"
 
 export const dynamic = "force-dynamic"
 
+/** Freya's sage palette, as literal colors so it reads the same in light and dark. */
+const SAGE = "#6B9A78"
+const SAGE_SOFT = "rgba(107, 154, 120, 0.22)"
+const HONEY = "#E0A84A"
+const MUTED_BAR = "rgba(148, 163, 184, 0.25)"
+
 const MISS_REASON_LABELS: Record<string, string> = {
-  keywordsNotMatched: "Comment didn't match the keyword",
+  keywordsNotMatched: "Didn't contain a keyword",
+  postNotMatched: "Post not watched by any automation",
   contactNotNew: "Already a contact (new contacts only)",
   alreadyRepliedOnPost: "Already answered this person on this post",
   commentIsReply: "Was a reply to another comment",
-  postNotMatched: "Post not watched by this automation",
   outsideSchedule: "Outside the automation's hours",
   mentionCountNotMatched: "Didn't tag enough people",
   engagedOnOtherPost: "Already engaged on another post",
 }
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-const pct = (part: number, whole: number) =>
-  whole > 0 ? `${Math.round((part / whole) * 1000) / 10}%` : "—"
 
 const CHANNEL_LABELS: Record<string, string> = {
   messenger: "Facebook",
@@ -40,13 +41,33 @@ const CHANNEL_LABELS: Record<string, string> = {
   instagramFacebook: "Instagram",
 }
 
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+const pct = (part: number, whole: number) =>
+  whole > 0 ? `${Math.round((part / whole) * 1000) / 10}%` : "—"
+
 const channelLabel = (type: string | null) =>
   (type && CHANNEL_LABELS[type]) ?? type ?? "—"
 
-function postLink(postId: string, type: string | null): string | null {
+function hourLabel(hour: number): string {
+  if (hour === 0) {
+    return "12a"
+  }
+  if (hour === 12) {
+    return "12p"
+  }
+  return hour < 12 ? `${hour}a` : `${hour - 12}p`
+}
+
+function postLink(post: FreyaStats["posts"][number]): string | null {
+  if (post.permalink) {
+    return post.permalink
+  }
   // A Facebook comment's post id is `{pageId}_{storyId}`, which facebook.com
-  // resolves; an Instagram media id has no public URL without another API call.
-  return type === "messenger" ? `https://www.facebook.com/${postId}` : null
+  // resolves; an Instagram media id has no public URL without its permalink.
+  return post.type === "messenger"
+    ? `https://www.facebook.com/${post.postId}`
+    : null
 }
 
 export default async function FreyaStatsPage({
@@ -106,13 +127,16 @@ export default async function FreyaStatsPage({
   return (
     <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <AnalyticsNav adsChannels={adsChannels} showGoogleAds={showGoogleAds} />
-      <div className="flex min-w-0 flex-1 flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-semibold text-xl">Freya stats</h1>
+            <h1 className="font-semibold text-2xl tracking-tight">
+              Freya stats
+            </h1>
             <p className="text-muted-foreground text-sm">
-              Comments, DMs and taps across every comment automation. Times in{" "}
-              {stats.timezone}.
+              Every comment, DM, tap and Amazon click from your automations ·{" "}
+              {FREYA_STATS_RANGES[range].label.toLowerCase()} · times in{" "}
+              {stats.timezone}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -133,10 +157,10 @@ export default async function FreyaStatsPage({
               }))}
             />
           </div>
-        </div>
+        </header>
 
         {stats.errors.length > 0 ? (
-          <div className="rounded-lg border border-destructive/50 p-3 text-destructive text-xs">
+          <div className="rounded-xl border border-destructive/50 p-3 text-destructive text-xs">
             Some sections could not load:
             <ul className="mt-1 list-disc pl-4">
               {stats.errors.map((error) => (
@@ -145,21 +169,37 @@ export default async function FreyaStatsPage({
             </ul>
           </div>
         ) : null}
-        <Kpis stats={stats} />
-        <Funnel stats={stats} />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Section
-            hint="When people comment, in your workspace time zone."
-            title="Comments by hour"
-          >
-            <VerticalBars
-              items={stats.hours.map((h) => ({
-                label: String(h.hour),
-                value: h.count,
-              }))}
-            />
-          </Section>
+        <Kpis stats={stats} />
+
+        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-5">
+          <div className="2xl:col-span-3">
+            <Funnel stats={stats} />
+          </div>
+          <div className="2xl:col-span-2">
+            <Section
+              hint="Tracked links (Magic Links) people tapped in your DMs."
+              title="Link clicks"
+            >
+              <LinksTable rows={stats.links} />
+            </Section>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <Section
+              hint="When people comment, in your workspace time zone."
+              title="Comments by hour"
+            >
+              <VerticalBars
+                items={stats.hours.map((h) => ({
+                  label: hourLabel(h.hour),
+                  value: h.count,
+                }))}
+              />
+            </Section>
+          </div>
           <Section title="Comments by weekday">
             <VerticalBars
               items={stats.weekdays.map((d) => ({
@@ -171,7 +211,7 @@ export default async function FreyaStatsPage({
         </div>
 
         <Section
-          hint="Answered = an automation replied. Missed = seen but no keyword matched (or another rule skipped it)."
+          hint="Answered = an automation replied. Not answered = no automation took it (usually no keyword)."
           title="Day by day"
         >
           <DailyTable rows={stats.daily} />
@@ -188,33 +228,37 @@ export default async function FreyaStatsPage({
           <PostsTable rows={stats.posts} />
         </Section>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Section
-            hint="Exact comment text, most common first. Green = answered."
+            hint="Exact comment text, most common first."
             title="What people comment"
           >
+            <Legend />
             <BarList
               empty="No comments yet."
               items={stats.words.map((w) => ({
                 label: w.text,
                 value: w.count,
-                note: w.answered > 0 ? "answered" : "missed",
-                good: w.answered > 0,
+                color: w.answered > 0 ? SAGE_SOFT : MUTED_BAR,
               }))}
             />
           </Section>
-          <div className="flex flex-col gap-6">
-            <Section title="Why comments were not answered">
+          <div className="flex flex-col gap-5">
+            <Section
+              hint="Comments no automation answered, and why."
+              title="Not answered"
+            >
               <BarList
-                empty="Nothing missed."
+                empty="Every comment was answered."
                 items={stats.missReasons.map((m) => ({
                   label: MISS_REASON_LABELS[m.reason] ?? m.reason,
                   value: m.count,
+                  color: MUTED_BAR,
                 }))}
               />
             </Section>
             <Section
-              hint="What Instagram/Facebook said when a reply didn't go through."
+              hint="What Instagram/Facebook answered when a reply didn't go through."
               title="Why DMs failed"
             >
               <FailuresTable rows={stats.failures} />
@@ -245,16 +289,17 @@ function Pills({
   current: string
 }) {
   return (
-    <div className="flex rounded-md border p-0.5">
+    <div className="flex rounded-lg border bg-card p-0.5">
       {items.map((item) => (
         <Link
-          className={`rounded px-2.5 py-1 text-xs ${
+          className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
             item.key === current
-              ? "bg-accent font-medium text-accent-foreground"
+              ? "font-medium text-white"
               : "text-muted-foreground hover:text-foreground"
           }`}
           href={item.href}
           key={item.key}
+          style={item.key === current ? { backgroundColor: SAGE } : undefined}
         >
           {item.label}
         </Link>
@@ -273,8 +318,8 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-lg border bg-card p-4">
-      <h2 className="font-medium text-sm">{title}</h2>
+    <section className="h-full rounded-xl border bg-card p-4 shadow-xs">
+      <h2 className="font-semibold text-sm">{title}</h2>
       {hint ? (
         <p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>
       ) : null}
@@ -289,33 +334,55 @@ function Kpis({ stats }: { stats: FreyaStats }) {
     {
       label: "Comments",
       value: t.comments,
-      sub: `${t.unanswered} not answered`,
+      sub: `${t.answered} answered · ${t.unanswered} not`,
     },
-    { label: "DMs sent", value: t.dmSent, sub: `${t.peopleReached} people` },
+    {
+      label: "DMs sent",
+      value: t.dmSent,
+      sub: `to ${t.peopleReached} people`,
+    },
     {
       label: "Delivered",
       value: t.dmDelivered,
-      sub: pct(t.dmDelivered, t.dmSent),
+      sub: `${pct(t.dmDelivered, t.dmSent)} of sent`,
     },
-    { label: "Seen", value: t.dmSeen, sub: pct(t.dmSeen, t.dmDelivered) },
+    {
+      label: "Seen",
+      value: t.dmSeen,
+      sub: `${pct(t.dmSeen, t.dmDelivered)} of delivered`,
+    },
     {
       label: "Button taps",
       value: t.tapped,
-      sub: pct(t.tapped, t.dmDelivered),
+      sub: `${pct(t.tapped, t.dmDelivered)} of delivered`,
+    },
+    {
+      label: "Link clicks",
+      value: t.linkClicks,
+      sub: `${t.linkPeople} people`,
+      accent: HONEY,
     },
     {
       label: "Failed",
       value: t.failed,
-      sub: pct(t.failed, t.dmSent + t.failed),
+      sub: `${pct(t.failed, t.dmSent + t.failed)} of attempts`,
     },
-    { label: "Public replies", value: t.publicReplies, sub: "under comments" },
+    {
+      label: "Public replies",
+      value: t.publicReplies,
+      sub: "under comments",
+    },
     { label: "New contacts", value: t.newContacts, sub: "in this period" },
-    { label: "Tapped gummies", value: t.tappedTag, sub: "tag, all time" },
+    { label: "Tapped gummies", value: t.tappedTag, sub: "tag · all time" },
   ]
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {items.map((item) => (
-        <div className="rounded-lg border bg-card p-3" key={item.label}>
+        <div
+          className="rounded-xl border bg-card p-3 shadow-xs"
+          key={item.label}
+          style={{ borderTop: `3px solid ${item.accent ?? SAGE}` }}
+        >
           <div className="text-muted-foreground text-xs">{item.label}</div>
           <div className="font-semibold text-2xl tabular-nums">
             {item.value.toLocaleString()}
@@ -335,29 +402,33 @@ function Funnel({ stats }: { stats: FreyaStats }) {
     { label: "DM sent", value: t.dmSent },
     { label: "Delivered", value: t.dmDelivered },
     { label: "Seen", value: t.dmSeen },
-    { label: "Tapped", value: t.tapped },
+    { label: "Tapped button", value: t.tapped },
+    { label: "Clicked link", value: t.linkClicks, color: HONEY },
   ]
   const top = Math.max(1, ...steps.map((s) => s.value))
   return (
     <Section
-      hint="Seen stays empty until the Meta app sends read receipts (message_reads / messaging_seen webhooks)."
-      title="Funnel"
+      hint="Seen stays at 0 until the Meta app sends read receipts (message_reads / messaging_seen webhooks)."
+      title="Funnel: comment → Amazon"
     >
       <div className="flex flex-col gap-2">
         {steps.map((step, index) => (
           <div className="flex items-center gap-3 text-sm" key={step.label}>
-            <div className="w-24 shrink-0 text-muted-foreground">
+            <div className="w-28 shrink-0 text-muted-foreground">
               {step.label}
             </div>
-            <div className="h-6 flex-1 rounded bg-muted">
+            <div className="h-7 flex-1 overflow-hidden rounded-md bg-muted">
               <div
-                className="flex h-6 items-center rounded bg-primary/80 px-2 text-primary-foreground text-xs tabular-nums"
-                style={{ width: `${Math.max(2, (step.value / top) * 100)}%` }}
+                className="flex h-7 items-center rounded-md px-2 font-medium text-white text-xs tabular-nums"
+                style={{
+                  width: `${Math.max(3, (step.value / top) * 100)}%`,
+                  backgroundColor: step.color ?? SAGE,
+                }}
               >
                 {step.value.toLocaleString()}
               </div>
             </div>
-            <div className="w-16 shrink-0 text-right text-muted-foreground text-xs tabular-nums">
+            <div className="w-14 shrink-0 text-right text-muted-foreground text-xs tabular-nums">
               {index === 0 ? "" : pct(step.value, steps[index - 1]?.value ?? 0)}
             </div>
           </div>
@@ -374,7 +445,7 @@ function VerticalBars({
 }) {
   const top = Math.max(1, ...items.map((i) => i.value))
   return (
-    <div className="flex h-36 items-end gap-1">
+    <div className="flex h-40 items-end gap-1">
       {items.map((item) => (
         <div
           className="flex flex-1 flex-col items-center gap-1"
@@ -385,8 +456,11 @@ function VerticalBars({
             {item.value || ""}
           </div>
           <div
-            className="w-full rounded-t bg-primary/70"
-            style={{ height: `${(item.value / top) * 96}px` }}
+            className="w-full rounded-t-sm"
+            style={{
+              height: `${Math.max(item.value ? 4 : 1, (item.value / top) * 104)}px`,
+              backgroundColor: item.value ? SAGE : MUTED_BAR,
+            }}
           />
           <div className="text-[10px] text-muted-foreground">{item.label}</div>
         </div>
@@ -395,11 +469,32 @@ function VerticalBars({
   )
 }
 
+function Legend() {
+  return (
+    <div className="mb-2 flex gap-4 text-muted-foreground text-xs">
+      <span className="flex items-center gap-1">
+        <span
+          className="inline-block size-2.5 rounded-sm"
+          style={{ backgroundColor: SAGE }}
+        />
+        answered
+      </span>
+      <span className="flex items-center gap-1">
+        <span
+          className="inline-block size-2.5 rounded-sm"
+          style={{ backgroundColor: "rgba(148, 163, 184, 0.6)" }}
+        />
+        not answered
+      </span>
+    </div>
+  )
+}
+
 function BarList({
   items,
   empty,
 }: {
-  items: { label: string; value: number; note?: string; good?: boolean }[]
+  items: { label: string; value: number; color: string }[]
   empty: string
 }) {
   if (items.length === 0) {
@@ -410,18 +505,19 @@ function BarList({
     <div className="flex flex-col gap-1.5">
       {items.map((item) => (
         <div className="flex items-center gap-3 text-sm" key={item.label}>
-          <div className="relative h-6 flex-1 overflow-hidden rounded bg-muted">
+          <div className="relative h-7 flex-1 overflow-hidden rounded-md bg-muted/40">
             <div
-              className={`absolute inset-y-0 left-0 ${
-                item.good === false ? "bg-muted-foreground/30" : "bg-primary/40"
-              }`}
-              style={{ width: `${(item.value / top) * 100}%` }}
+              className="absolute inset-y-0 left-0 rounded-md"
+              style={{
+                width: `${Math.max(2, (item.value / top) * 100)}%`,
+                backgroundColor: item.color,
+              }}
             />
-            <span className="relative truncate px-2 leading-6">
+            <span className="relative block truncate px-2 leading-7">
               {item.label}
             </span>
           </div>
-          <div className="w-10 shrink-0 text-right tabular-nums">
+          <div className="w-10 shrink-0 text-right font-medium tabular-nums">
             {item.value}
           </div>
         </div>
@@ -438,7 +534,7 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
           <tr className="border-b text-left text-muted-foreground text-xs">
             {head.map((h, index) => (
               <th
-                className={`px-2 py-2 font-medium ${index > 0 ? "text-right" : ""}`}
+                className={`whitespace-nowrap px-2 py-2 font-medium ${index > 0 ? "text-right" : ""}`}
                 key={h}
               >
                 {h}
@@ -452,7 +548,12 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
   )
 }
 
-const td = "px-2 py-1.5 text-right"
+const td = "px-2 py-2 text-right"
+const row = "border-b last:border-0 hover:bg-muted/40"
+
+function Rate({ part, whole }: { part: number; whole: number }) {
+  return <span className="text-muted-foreground">{pct(part, whole)}</span>
+}
 
 function DailyTable({ rows }: { rows: FreyaStats["daily"] }) {
   if (rows.length === 0) {
@@ -463,26 +564,28 @@ function DailyTable({ rows }: { rows: FreyaStats["daily"] }) {
       head={[
         "Day",
         "Answered",
-        "Missed",
+        "Not answered",
         "DMs sent",
         "Delivered",
         "Seen",
-        "Tapped",
+        "Taps",
+        "Link clicks",
         "Failed",
-        "Tap rate",
       ]}
     >
       {rows.map((r) => (
-        <tr className="border-b last:border-0" key={r.day}>
-          <td className="px-2 py-1.5">{r.day}</td>
+        <tr className={row} key={r.day}>
+          <td className="whitespace-nowrap px-2 py-2">{r.day}</td>
           <td className={td}>{r.answeredComments}</td>
           <td className={td}>{r.missedComments}</td>
           <td className={td}>{r.dmSent}</td>
-          <td className={td}>{r.dmDelivered}</td>
+          <td className={td}>
+            {r.dmDelivered} <Rate part={r.dmDelivered} whole={r.dmSent} />
+          </td>
           <td className={td}>{r.dmSeen}</td>
           <td className={td}>{r.tapped}</td>
+          <td className={td}>{r.linkClicks}</td>
           <td className={td}>{r.failed}</td>
-          <td className={td}>{pct(r.tapped, r.dmDelivered)}</td>
         </tr>
       ))}
     </Table>
@@ -502,15 +605,14 @@ function AutomationsTable({ rows }: { rows: FreyaStats["automations"] }) {
         "DMs",
         "Delivered",
         "Seen",
-        "Tapped",
-        "Tap rate",
+        "Taps",
         "Failed",
         "Public replies",
       ]}
     >
       {rows.map((r) => (
-        <tr className="border-b last:border-0" key={r.id}>
-          <td className="px-2 py-1.5">
+        <tr className={row} key={r.id}>
+          <td className="px-2 py-2">
             {r.name}
             {r.isActive ? null : (
               <span className="ml-1 text-muted-foreground text-xs">(off)</span>
@@ -519,10 +621,13 @@ function AutomationsTable({ rows }: { rows: FreyaStats["automations"] }) {
           <td className={td}>{channelLabel(r.type)}</td>
           <td className={td}>{r.comments}</td>
           <td className={td}>{r.dmSent}</td>
-          <td className={td}>{pct(r.dmDelivered, r.dmSent)}</td>
+          <td className={td}>
+            {r.dmDelivered} <Rate part={r.dmDelivered} whole={r.dmSent} />
+          </td>
           <td className={td}>{r.dmSeen}</td>
-          <td className={td}>{r.tapped}</td>
-          <td className={td}>{pct(r.tapped, r.dmDelivered)}</td>
+          <td className={td}>
+            {r.tapped} <Rate part={r.tapped} whole={r.dmDelivered} />
+          </td>
           <td className={td}>{r.failed}</td>
           <td className={td}>{r.publicReplies}</td>
         </tr>
@@ -537,43 +642,86 @@ function PostsTable({ rows }: { rows: FreyaStats["posts"] }) {
   }
   return (
     <Table
-      head={[
-        "Post",
-        "Channel",
-        "Comments",
-        "Answered",
-        "DMs",
-        "Tapped",
-        "Last comment",
-      ]}
+      head={["Post", "Channel", "Comments", "Answered", "DMs", "Taps", "Last"]}
     >
       {rows.map((r) => {
-        const link = postLink(r.postId, r.type)
+        const link = postLink(r)
+        const title = r.caption?.split("\n")[0] || `Post ${r.postId}`
         return (
-          <tr className="border-b last:border-0" key={r.postId}>
-            <td className="max-w-56 truncate px-2 py-1.5">
-              {link ? (
-                <a
-                  className="underline"
-                  href={link}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {r.postId}
-                </a>
-              ) : (
-                r.postId
-              )}
+          <tr className={row} key={r.postId}>
+            <td className="px-2 py-2">
+              <div className="flex items-center gap-2">
+                {r.thumbnail ? (
+                  // biome-ignore lint/performance/noImgElement: remote CDN thumbnail of unknown host
+                  <img
+                    alt=""
+                    className="size-10 shrink-0 rounded-md object-cover"
+                    height={40}
+                    src={r.thumbnail}
+                    width={40}
+                  />
+                ) : (
+                  <div className="size-10 shrink-0 rounded-md bg-muted" />
+                )}
+                <div className="min-w-0 max-w-80">
+                  {link ? (
+                    <a
+                      className="block truncate hover:underline"
+                      href={link}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {title}
+                    </a>
+                  ) : (
+                    <span className="block truncate">{title}</span>
+                  )}
+                </div>
+              </div>
             </td>
             <td className={td}>{channelLabel(r.type)}</td>
             <td className={td}>{r.comments}</td>
-            <td className={td}>{pct(r.answered, r.comments)}</td>
+            <td className={td}>
+              {r.answered} <Rate part={r.answered} whole={r.comments} />
+            </td>
             <td className={td}>{r.dmSent}</td>
             <td className={td}>{r.tapped}</td>
-            <td className={td}>{r.lastComment?.toLocaleDateString() ?? "—"}</td>
+            <td className={`${td} whitespace-nowrap`}>
+              {r.lastComment?.toLocaleDateString() ?? "—"}
+            </td>
           </tr>
         )
       })}
+    </Table>
+  )
+}
+
+function LinksTable({ rows }: { rows: FreyaStats["links"] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No tracked link clicks yet. Use a Magic Link on the Amazon button to
+        count them.
+      </p>
+    )
+  }
+  return (
+    <Table head={["Link", "Clicks", "People", "Last"]}>
+      {rows.map((r) => (
+        <tr className={row} key={r.name}>
+          <td className="px-2 py-2">
+            <div className="font-medium">{r.name}</div>
+            <div className="max-w-56 truncate text-muted-foreground text-xs">
+              {r.url}
+            </div>
+          </td>
+          <td className={td}>{r.clicks}</td>
+          <td className={td}>{r.people}</td>
+          <td className={`${td} whitespace-nowrap`}>
+            {r.last?.toLocaleDateString() ?? "—"}
+          </td>
+        </tr>
+      ))}
     </Table>
   )
 }
@@ -586,12 +734,12 @@ function FailuresTable({ rows }: { rows: FreyaStats["failures"] }) {
     <div className="flex flex-col gap-2">
       {rows.map((r) => (
         <div
-          className="rounded border p-2 text-xs"
+          className="rounded-lg border p-2 text-xs"
           key={`${r.detail}-${r.httpCode}`}
         >
           <div className="flex justify-between gap-2">
             <span className="font-medium">
-              {r.count}× {r.httpCode ? `HTTP ${r.httpCode}` : ""}
+              {r.count}× {r.httpCode ? `· code ${r.httpCode}` : ""}
             </span>
             <span className="text-muted-foreground">
               last {r.last?.toLocaleDateString() ?? "—"}
@@ -613,14 +761,34 @@ function InboxTable({ rows }: { rows: FreyaStats["inbox"] }) {
   return (
     <Table head={["Day", "From people", "From bot / AI", "From you"]}>
       {rows.map((r) => (
-        <tr className="border-b last:border-0" key={r.day}>
-          <td className="px-2 py-1.5">{r.day}</td>
+        <tr className={row} key={r.day}>
+          <td className="px-2 py-2">{r.day}</td>
           <td className={td}>{r.incoming}</td>
           <td className={td}>{r.bot}</td>
           <td className={td}>{r.human}</td>
         </tr>
       ))}
     </Table>
+  )
+}
+
+function Outcome({ r }: { r: FreyaStats["feed"][number] }) {
+  if (r.failed) {
+    return (
+      <span className="text-destructive" title={r.errorDetail ?? ""}>
+        Failed
+      </span>
+    )
+  }
+  const steps = [
+    r.delivered ? "Delivered" : "Sent",
+    r.seen ? "Seen" : null,
+    r.clicked ? "Tapped" : null,
+  ].filter(Boolean)
+  return (
+    <span style={r.clicked ? { color: SAGE } : undefined}>
+      {steps.join(" · ")}
+    </span>
   )
 }
 
@@ -643,40 +811,25 @@ function FeedTable({ rows }: { rows: FreyaStats["feed"] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr className="border-b align-top last:border-0" key={r.id}>
-              <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground text-xs">
+            <tr className={`${row} align-top`} key={r.id}>
+              <td className="whitespace-nowrap px-2 py-2 text-muted-foreground text-xs">
                 {r.occurredAt.toLocaleString()}
               </td>
-              <td className="px-2 py-1.5">{r.contactName ?? "—"}</td>
-              <td className="max-w-48 truncate px-2 py-1.5">
+              <td className="px-2 py-2">{r.contactName ?? "—"}</td>
+              <td className="max-w-48 truncate px-2 py-2">
                 {r.commentText ?? "—"}
               </td>
-              <td className="px-2 py-1.5">
+              <td className="px-2 py-2">
                 {r.automation}
                 <span className="ml-1 text-muted-foreground text-xs">
                   {channelLabel(r.type)}
                 </span>
               </td>
-              <td className="px-2 py-1.5 text-xs">
-                {r.replyChannel === "private" ? "DM" : "Public"} · {r.replyType}
+              <td className="whitespace-nowrap px-2 py-2 text-xs">
+                {r.replyChannel === "private" ? "DM" : "Public reply"}
               </td>
-              <td className="px-2 py-1.5 text-xs">
-                {r.failed ? (
-                  <span
-                    className="text-destructive"
-                    title={r.errorDetail ?? ""}
-                  >
-                    Failed
-                  </span>
-                ) : (
-                  [
-                    r.delivered ? "Delivered" : "Sent",
-                    r.seen ? "Seen" : null,
-                    r.clicked ? "Tapped" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                )}
+              <td className="whitespace-nowrap px-2 py-2 text-xs">
+                <Outcome r={r} />
               </td>
             </tr>
           ))}
