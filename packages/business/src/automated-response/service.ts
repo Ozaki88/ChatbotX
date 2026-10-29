@@ -202,8 +202,10 @@ class AutomatedResponseService extends BaseService {
   ): Promise<AutomatedResponseModel> {
     const client = tx ?? db
 
-    const flowId = values.flowId ?? undefined
-    const text = values.text ?? undefined
+    // The form sends "" for the mode it did not pick; an empty flowId would
+    // reach the bigint column and fail the insert, so treat "" as unset.
+    const flowId = values.flowId || undefined
+    const text = values.text || undefined
 
     if (flowId && text) {
       throw validationException(
