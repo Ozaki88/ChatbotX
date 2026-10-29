@@ -1,6 +1,8 @@
 import "server-only"
 
+import { resolveTenantSettings } from "@chatbotx.io/business"
 import { db, type SQL, sql } from "@chatbotx.io/database/client"
+import { getPublicFileUrl } from "@chatbotx.io/utils"
 import {
   canonicalizeTimezone,
   isValidTimezone,
@@ -41,6 +43,8 @@ export type FreyaStatsFilter = {
 }
 
 type Row = Record<string, unknown>
+
+const ABSOLUTE_URL = /^https?:\/\//
 
 const num = (value: unknown): number => Number(value ?? 0)
 
@@ -372,6 +376,13 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
     ),
   ])
 
+  // Post thumbnails are stored as paths in ChatbotX's own file storage.
+  const { storageUrl } = await resolveTenantSettings({
+    workspaceId: filter.workspaceId,
+  })
+  const fileUrl = (path: string) =>
+    ABSOLUTE_URL.test(path) ? path : getPublicFileUrl(path, storageUrl)
+
   const t = totals[0] ?? {}
   const ct = commentTotals[0] ?? {}
 
@@ -433,7 +444,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       dmSent: num(r.dmSent),
       tapped: num(r.tapped),
       caption: r.caption ? String(r.caption) : null,
-      thumbnail: r.thumbnail ? String(r.thumbnail) : null,
+      thumbnail: r.thumbnail ? fileUrl(String(r.thumbnail)) : null,
       permalink: r.permalink ? String(r.permalink) : null,
       lastComment: r.lastComment ? new Date(String(r.lastComment)) : null,
     })),
