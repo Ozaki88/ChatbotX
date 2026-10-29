@@ -98,7 +98,7 @@ export class Uploader {
     return (
       await client.sign(
         new Request(
-          `${env.S3_ENDPOINT}/${env.S3_BUCKET}/${filePath}?X-Amz-Expires=${5 * 60}`,
+          `${env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT}/${env.S3_BUCKET}/${filePath}?X-Amz-Expires=${5 * 60}`,
           {
             method: "PUT",
           },
@@ -124,7 +124,7 @@ export class Uploader {
     return (
       await client.sign(
         new Request(
-          `${env.S3_ENDPOINT}/${env.S3_BUCKET}/${filePath}?X-Amz-Expires=${expiresInSeconds}`,
+          `${env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT}/${env.S3_BUCKET}/${filePath}?X-Amz-Expires=${expiresInSeconds}`,
           {
             method: "GET",
           },
