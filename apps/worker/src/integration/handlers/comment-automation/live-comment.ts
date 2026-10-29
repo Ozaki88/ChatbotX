@@ -8,8 +8,10 @@ import { logger } from "../../../lib/logger"
  */
 const LIVE_POST_TTL_SECONDS = 7 * 24 * 60 * 60
 
+// v2: posts wrongly cached as live by the earlier "unknown means live" rule
+// (reels) would stay skipped for 7 days; a new prefix drops those entries.
 const livePostKey = (integrationId: string, postId: string) =>
-  `comment-live-post:${integrationId}:${postId}`
+  `comment-live-post:v2:${integrationId}:${postId}`
 
 /**
  * Decides whether a Facebook comment was made on a live broadcast.

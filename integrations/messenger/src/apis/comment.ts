@@ -273,16 +273,20 @@ async function isOnLiveVideo(
         searchParams: { fields: "object{live_status}" },
       }),
     )
+    // No readable video (a reel, or a token without access to it): a live
+    // broadcast always exposes its video, so this is an ordinary comment.
+    // Treating it as live made "all posts" automations skip every comment on
+    // the post — and the live flag is then cached for the whole post.
     if (!res.object) {
-      return true
+      return false
     }
     return LIVE_VIDEO_STATUSES.has(res.object.live_status ?? "")
   } catch (error) {
     logger.warn(
       { err: error, commentId },
-      "Failed to confirm the comment's live video, trusting its broadcast timestamp",
+      "Failed to confirm the comment's live video, treating it as a regular comment",
     )
-    return true
+    return false
   }
 }
 
