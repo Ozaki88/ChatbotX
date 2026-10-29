@@ -3,6 +3,7 @@ import {
   type MissedCommentsIneligibleReason,
   workspaceService,
 } from "@chatbotx.io/business"
+import { db, sql } from "@chatbotx.io/database/client"
 import type { CommentAutomationType } from "@chatbotx.io/database/partials"
 import {
   LowJobAction,
@@ -107,6 +108,23 @@ export async function processMissedComments(props: {
       return { status: "failed", reason: "fetchFailed" }
     }
 
+    // Facebook hides a comment's author from the Graph listing unless the app
+    // holds extra permissions, so the scan above can come back empty. A comment
+    // this automation skipped as `postNotMatched` (a reel misjudged as live) is
+    // already on record with its author: replay it from there.
+    if (channelType === "messenger") {
+      const known = new Set(comments.map((c) => c.commentData.commentId))
+      const recorded = await findMisjudgedMessengerComments({
+        workspaceId: props.workspaceId,
+        automationId: automation.id,
+        since: subDays(new Date(), MISSED_COMMENTS_SCAN_DAYS),
+      })
+      comments = [
+        ...comments,
+        ...recorded.filter((c) => !known.has(c.commentData.commentId)),
+      ]
+    }
+
     const processed = await commentAutomationService.findProcessedCommentIds({
       automationId: automation.id,
       commentIds: comments.map((comment) => comment.commentData.commentId),
@@ -161,6 +179,59 @@ export async function processMissedComments(props: {
   } finally {
     await commentAutomationService.releaseMissedCommentsRun(automation.id)
   }
+}
+
+/**
+ * Facebook comments this automation skipped as `postNotMatched` and never
+ * answered, rebuilt from the miss row and the commenter's inbox — the same
+ * shape the `feed` webhook enqueues. Only top-level comments are recorded as
+ * misses on a misjudged post, so the post is the parent.
+ */
+async function findMisjudgedMessengerComments(props: {
+  workspaceId: string
+  automationId: string
+  since: Date
+}): Promise<ScannedComment[]> {
+  const result = await db.execute(sql`
+    SELECT DISTINCT ON (m."commentId")
+      m."commentId", m."postId", m."commentText", m."occurredAt",
+      ci."sourceId" AS "fromId", c."fullName" AS "fromName"
+    FROM "CommentAutomationMiss" m
+    JOIN "ContactInbox" ci ON ci."id" = m."contactInboxId"
+    LEFT JOIN "Contact" c ON c."id" = m."contactId"
+    WHERE m."workspaceId" = ${props.workspaceId}
+      AND m."automationId" = ${props.automationId}
+      AND m."reason" = 'postNotMatched'
+      AND m."occurredAt" >= ${props.since}
+      AND NOT EXISTS (
+        SELECT 1 FROM "CommentAutomationEvent" e
+        WHERE e."automationId" = m."automationId" AND e."commentId" = m."commentId"
+      )
+    ORDER BY m."commentId", m."occurredAt"
+  `)
+  return (result.rows as Record<string, unknown>[]).flatMap((row) => {
+    const postId = String(row.postId)
+    const pageId = postId.split("_")[0]
+    if (!(pageId && row.fromId)) {
+      return []
+    }
+    return [
+      {
+        integrationIdentifier: pageId,
+        commentData: {
+          commentId: String(row.commentId),
+          postId,
+          parentId: postId,
+          fromId: String(row.fromId),
+          fromName: row.fromName ? String(row.fromName) : undefined,
+          message: row.commentText ? String(row.commentText) : undefined,
+          createdTime: Math.floor(
+            new Date(String(row.occurredAt)).getTime() / 1000,
+          ),
+        },
+      },
+    ]
+  })
 }
 
 /**
