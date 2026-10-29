@@ -32,7 +32,9 @@ export default async function ContactsAnalyticsPage({
     return notFound()
   }
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Some browsers (privacy settings, extensions) report no zone name; the
+  // analytics routes require one, so fall back to UTC instead of failing.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
   const { targetWorkspace } = userAndWorkspace
   const isSuperAdmin = hasWorkspacePermission(
     userAndWorkspace.targetWorkspaceMember.permissions,

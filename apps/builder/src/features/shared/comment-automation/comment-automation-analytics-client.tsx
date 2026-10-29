@@ -22,7 +22,9 @@ export function CommentAutomationAnalyticsClient({
   automationId: string
   automationName: string
 }) {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Some browsers (privacy settings, extensions) report no zone name; the
+  // analytics routes require one, so fall back to UTC instead of failing.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
   return (
     <CommentAutomationAnalytics
       defaultSearchParams={{

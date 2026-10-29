@@ -11,7 +11,9 @@ export function ReflinkAnalyticsClient({
   linkId: string
   linkName: string
 }) {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Some browsers (privacy settings, extensions) report no zone name; the
+  // analytics routes require one, so fall back to UTC instead of failing.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
   return (
     <ReflinkAnalytics
       defaultSearchParams={{ workspaceId, linkId, timezone, linkName }}
