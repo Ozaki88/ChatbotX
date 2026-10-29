@@ -12,6 +12,7 @@ import {
 import { subDays } from "date-fns"
 import { logger } from "@/lib/log"
 import { scanPostComments } from "./index"
+import { listRecentPostIds } from "./list-recent-posts"
 import {
   MISSED_COMMENTS_SCAN_DAYS,
   MissedCommentsIntegrationNotFoundError,
@@ -88,7 +89,7 @@ export async function processMissedComments(props: {
   try {
     let comments: ScannedComment[]
     try {
-      comments = await scanPostComments({
+      comments = await scanAutomationComments({
         type: channelType,
         workspaceId: props.workspaceId,
         postId,
@@ -149,6 +150,46 @@ export async function processMissedComments(props: {
   } finally {
     await commentAutomationService.releaseMissedCommentsRun(automation.id)
   }
+}
+
+/**
+ * The recent comments an automation watches: its one post's, or — for an
+ * "every post" automation (`postId` null) — those of the account's newest
+ * posts. One post that cannot be read does not end the run; it fails only
+ * when every post did.
+ */
+async function scanAutomationComments(props: {
+  type: CommentAutomationType
+  workspaceId: string
+  postId: string | null
+  since: Date
+  inboxId: string | null
+}): Promise<ScannedComment[]> {
+  const { postId, ...rest } = props
+  if (postId) {
+    return scanPostComments({ ...rest, postId })
+  }
+
+  const postIds = await listRecentPostIds(rest)
+  const comments: ScannedComment[] = []
+  let lastError: unknown
+  let scannedAny = postIds.length === 0
+  for (const recentPostId of postIds) {
+    try {
+      comments.push(...(await scanPostComments({ ...rest, postId: recentPostId })))
+      scannedAny = true
+    } catch (error) {
+      lastError = error
+      logger.warn(
+        { err: error, postId: recentPostId },
+        "Process missed comments: reading one post's comments failed",
+      )
+    }
+  }
+  if (!scannedAny) {
+    throw lastError
+  }
+  return comments
 }
 
 /**

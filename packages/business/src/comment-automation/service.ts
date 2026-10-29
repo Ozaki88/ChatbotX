@@ -514,7 +514,8 @@ class CommentAutomationService extends BaseService {
         eligible: true
         automation: CommentAutomationModel
         channelType: CommentAutomationType
-        postId: string
+        /** The single post to scan; `null` scans the account's newest posts. */
+        postId: string | null
       }
     | { eligible: false; reason: MissedCommentsIneligibleReason }
   > {
@@ -525,10 +526,16 @@ class CommentAutomationService extends BaseService {
       throw notFoundException("Comment automation not found")
     }
 
-    const [postId] = automation.post.value
-    if (!(canProcessMissedComments(automation.post) && postId)) {
+    const channelType = commentAutomationTypes.parse(automation.type)
+    const singlePost = automation.post.type === "postIds"
+    const [firstPostId] = automation.post.value
+    if (
+      !canProcessMissedComments(automation.post, channelType) ||
+      (singlePost && !firstPostId)
+    ) {
       return { eligible: false, reason: "notSinglePost" }
     }
+    const postId = singlePost ? (firstPostId ?? null) : null
     if (!automation.isActive) {
       return { eligible: false, reason: "inactive" }
     }
@@ -547,7 +554,7 @@ class CommentAutomationService extends BaseService {
     return {
       eligible: true,
       automation,
-      channelType: commentAutomationTypes.parse(automation.type),
+      channelType,
       postId,
     }
   }

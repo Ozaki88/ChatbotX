@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  type CommentAutomationType,
   canProcessMissedComments,
   folderTypes,
 } from "@chatbotx.io/database/partials"
@@ -264,7 +265,10 @@ export function IgCommentsTable({
                   <TextIcon className="me-2" />
                   {t("actions.rename")}
                 </DropdownMenuItem>
-                {canProcessMissedComments(row.original.post) ? (
+                {canProcessMissedComments(
+                  row.original.post,
+                  row.original.type as CommentAutomationType,
+                ) ? (
                   <DropdownMenuItem
                     disabled={missedCommentsInProgress.has(row.original.id)}
                     onClick={() => setMissedCommentsItem(row.original)}

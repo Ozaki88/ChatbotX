@@ -265,7 +265,7 @@ export function FbCommentsTable({
                   <TextIcon className="me-2" />
                   {t("actions.rename")}
                 </DropdownMenuItem>
-                {canProcessMissedComments(row.original.post) ? (
+                {canProcessMissedComments(row.original.post, "messenger") ? (
                   <DropdownMenuItem
                     disabled={missedCommentsInProgress.has(row.original.id)}
                     onClick={() => setMissedCommentsItem(row.original)}

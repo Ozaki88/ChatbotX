@@ -7216,10 +7216,10 @@
     "action": "Process missed comments",
     "processing": "Processing missed comments",
     "title": "Process missed comments",
-    "description": "Scan this post's comments from the last 7 days and run them through this comment automation. Comments that were already processed are skipped. This sends real messages and replies.",
+    "description": "Scan the comments from the last 7 days and run them through this comment automation: on its post, or on your 25 newest posts when it watches every post. Comments that were already processed are skipped. This sends real messages and replies.",
     "success": "Scanned {scanned} comments: {skipped} already processed, {queued} queued for processing, {failed} failed.",
     "errors": {
-      "notSinglePost": "Only available for an automation that targets exactly one specific post.",
+      "notSinglePost": "Only available for an automation that targets one specific post, or every post on Facebook or Instagram.",
       "inactive": "Turn on this automation before processing missed comments.",
       "outsideSchedule": "This automation is outside its active hours. Try again during its schedule.",
       "workspaceInactive": "This workspace is turned off or outside its active hours, so no comment would be processed. Try again when the workspace is active.",

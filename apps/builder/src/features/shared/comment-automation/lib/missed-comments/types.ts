@@ -11,6 +11,9 @@ export const MISSED_COMMENTS_SCAN_DAYS = 7
  */
 export const MISSED_COMMENTS_MAX_PAGES = 200
 
+/** How many of the newest posts an "every post" automation's run scans. */
+export const MISSED_COMMENTS_MAX_POSTS = 25
+
 export type IncomingCommentData =
   IntegrationJobReceiveComment["data"]["commentData"]
 

@@ -138,12 +138,31 @@ export function liveCommentCapabilities(
 }
 
 /**
- * "Process missed comments" replays one post's recent comments, so it is only
- * offered on an automation that targets exactly one specific post. Shared by
- * the builder (to hide the action) and the service (to reject the call).
+ * "Process missed comments" replays recent comments: on the one post of a
+ * single-post automation, or — on Facebook and Instagram, where the account's
+ * recent posts can be listed — on the newest posts of an "every post"
+ * automation. Shared by the builder (to hide the action) and the service (to
+ * reject the call). Without `type`, only the single-post case is offered.
  */
-export function canProcessMissedComments(post: CommentPost): boolean {
-  return post.type === "postIds" && post.value.length === 1
+export function canProcessMissedComments(
+  post: CommentPost,
+  type?: CommentAutomationType,
+): boolean {
+  if (post.type === "postIds") {
+    return post.value.length === 1
+  }
+  return isEveryPostTarget(post) && canListRecentPosts(type)
+}
+
+/** An automation watching every post (not a fixed list, not live videos). */
+export function isEveryPostTarget(post: Pick<CommentPost, "type">): boolean {
+  return post.type === "all" || post.type === "published" || post.type === "reels"
+}
+
+function canListRecentPosts(type?: CommentAutomationType): boolean {
+  return (
+    type === "messenger" || type === "instagram" || type === "instagramFacebook"
+  )
 }
 
 export const commentReplyTypes = z.enum(["AIAgent", "text", "flow", "none"])
