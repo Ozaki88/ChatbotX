@@ -42,6 +42,7 @@ export function AnalyticsNav({
   const links: AnalyticsNavLink[] = [
     { label: t("analytics.contacts"), segment: "contacts" },
     { label: t("analytics.conversations"), segment: "conversations" },
+    { label: "Freya stats", segment: "freya-stats" },
     ...adsChannels.map((channel) => ({
       label: t(`ads.dashboardNav.${channel}`),
       segment: `ads/${channel}`,
