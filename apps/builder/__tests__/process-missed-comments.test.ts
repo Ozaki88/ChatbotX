@@ -12,6 +12,7 @@ const {
   mockReserveWindow,
   mockStartReplay,
   mockSettleEnqueue,
+  mockDbExecute,
 } = vi.hoisted(() => ({
   mockResolveTarget: vi.fn(),
   mockClaimRun: vi.fn(),
@@ -24,7 +25,24 @@ const {
   mockReserveWindow: vi.fn(),
   mockStartReplay: vi.fn(),
   mockSettleEnqueue: vi.fn(),
+  mockDbExecute: vi.fn(),
 }))
+
+// The Facebook record lookups: `sql` keeps the query text so a test can
+// answer the failed-DM lookup alone.
+vi.mock("@chatbotx.io/database/client", () => {
+  const sql = (strings: TemplateStringsArray, ...values: unknown[]) => ({
+    text: strings.join("?"),
+    values,
+  })
+  sql.join = (parts: unknown[]) => parts
+  return { db: { execute: mockDbExecute }, sql }
+})
+
+vi.mock(
+  "../src/features/shared/comment-automation/lib/missed-comments/list-recent-posts",
+  () => ({ listRecentPostIds: vi.fn().mockResolvedValue([]) }),
+)
 
 vi.mock("@chatbotx.io/business", () => ({
   commentAutomationService: {
@@ -97,6 +115,7 @@ beforeEach(() => {
   mockQueueAddBulk.mockResolvedValue([])
   mockWorkspaceFindById.mockResolvedValue({ id: "ws-1" })
   mockIsActiveNow.mockReturnValue(true)
+  mockDbExecute.mockResolvedValue({ rows: [] })
 })
 
 function enqueuedJobs() {
@@ -104,6 +123,41 @@ function enqueuedJobs() {
 }
 
 describe("processMissedComments", () => {
+  test("resends a DM that failed with a passing error, DM only", async () => {
+    mockScanPostComments.mockResolvedValue([scanned("c-1", 100)])
+    mockFindProcessed.mockResolvedValue(new Set(["c-1"]))
+    mockDbExecute.mockImplementation((query: { text: string }) =>
+      Promise.resolve({
+        rows: query.text.includes("'failed'")
+          ? [
+              {
+                id: "event-9",
+                commentId: "c-1",
+                postId: "page-1_story-1",
+                occurredAt: new Date(100_000).toISOString(),
+                fromId: "user-c-1",
+              },
+            ]
+          : [],
+      }),
+    )
+
+    await processMissedComments(PROPS)
+
+    expect(enqueuedJobs()).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          data: expect.objectContaining({
+            replay: { automationId: "automation-1", retryPrivateOnly: true },
+          }),
+        }),
+        opts: expect.objectContaining({
+          jobId: "retry-dm-automation-1-event-9",
+        }),
+      }),
+    ])
+  })
+
   test("passes an ineligible automation's reason through without locking", async () => {
     mockResolveTarget.mockResolvedValue({
       eligible: false,

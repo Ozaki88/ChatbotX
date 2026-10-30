@@ -31,7 +31,7 @@ vi.mock("@chatbotx.io/database/client", () => ({
   inArray: (column: unknown, values: unknown) => ({
     inArray: [column, values],
   }),
-  ne: vi.fn(),
+  ne: (column: unknown, value: unknown) => ({ ne: [column, value] }),
   relationsFilterToSQL: vi.fn(),
   sql: vi.fn(),
 }))
@@ -56,6 +56,7 @@ vi.mock("@chatbotx.io/database/schema", () => ({
     name: "miss",
     automationId: "Miss.automationId",
     commentId: "Miss.commentId",
+    reason: "Miss.reason",
   },
   commentAutomationModel: {
     name: "automation",
@@ -125,11 +126,6 @@ describe("commentAutomationService.resolveMissedCommentsTarget", () => {
   })
 
   test.each([
-    {
-      name: "all posts",
-      overrides: { post: { type: "all", value: [] } },
-      reason: "notSinglePost",
-    },
     {
       name: "several posts",
       overrides: { post: { type: "postIds", value: ["1_2", "1_3"] } },
@@ -202,6 +198,7 @@ describe("commentAutomationService.findProcessedCommentIds", () => {
       and: [
         { eq: ["Miss.automationId", "automation-1"] },
         { inArray: ["Miss.commentId", ["c-1", "c-2", "c-3"]] },
+        { ne: ["Miss.reason", "postNotMatched"] },
       ],
     })
   })

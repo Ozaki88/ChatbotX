@@ -239,13 +239,15 @@ describe("getCommentAttachment live comments", () => {
     expect(await lookup()).toEqual({ type: null, isLive: false })
   })
 
-  test("trusts the broadcast timestamp when the video lookup fails", async () => {
+  // Fork: an unreadable video is not taken as live — reels returned errors
+  // here and every comment on them was skipped as postNotMatched.
+  test("does not call a comment live when the video lookup fails", async () => {
     mockGraphComment({
       comment: { live_broadcast_timestamp: 42 },
       video: "error",
     })
 
-    expect(await lookup()).toEqual({ type: null, isLive: true })
+    expect(await lookup()).toEqual({ type: null, isLive: false })
   })
 
   test("a comment without live_broadcast_timestamp is not live", async () => {
