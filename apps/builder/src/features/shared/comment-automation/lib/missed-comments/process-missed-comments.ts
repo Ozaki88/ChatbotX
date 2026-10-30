@@ -33,6 +33,9 @@ const MISSED_COMMENTS_REPLAY_SPACING_MS = 1000
 /** Jobs per `addBulk` call — one Redis round trip per chunk, not per comment. */
 const MISSED_COMMENTS_ENQUEUE_CHUNK_SIZE = 500
 
+/** A comment to replay; `retryEventId` marks a failed DM to resend alone. */
+type ReplayItem = ScannedComment & { retryEventId?: string }
+
 type ReplayJob = {
   name: typeof LowJobAction.replayMissedComment
   data: LowJobReplayMissedComment
@@ -129,12 +132,35 @@ export async function processMissedComments(props: {
       automationId: automation.id,
       commentIds: comments.map((comment) => comment.commentData.commentId),
     })
-    const pending = comments
-      .filter((comment) => !processed.has(comment.commentData.commentId))
-      .sort(
-        (left, right) =>
-          left.commentData.createdTime - right.commentData.createdTime,
-      )
+    // Answered comments whose DM failed for a passing reason get the DM again
+    // (and only the DM). The scanned copy is preferred: it carries the IG
+    // account; a Facebook one is rebuilt from the record.
+    const scannedById = new Map(
+      comments.map((comment) => [comment.commentData.commentId, comment]),
+    )
+    const retries = (
+      await findRetryableFailedDms({
+        workspaceId: props.workspaceId,
+        automationId: automation.id,
+        since: subDays(new Date(), MISSED_COMMENTS_SCAN_DAYS),
+      })
+    ).flatMap((failure): ReplayItem[] => {
+      const scanned = scannedById.get(failure.commentData.commentId)
+      if (scanned) {
+        return [{ ...scanned, retryEventId: failure.retryEventId }]
+      }
+      return channelType === "messenger" ? [failure] : []
+    })
+
+    const pending: ReplayItem[] = [
+      ...comments.filter(
+        (comment) => !processed.has(comment.commentData.commentId),
+      ),
+      ...retries,
+    ].sort(
+      (left, right) =>
+        left.commentData.createdTime - right.commentData.createdTime,
+    )
 
     let failed = 0
     if (pending.length > 0) {
@@ -164,6 +190,7 @@ export async function processMissedComments(props: {
         postId,
         scanned: comments.length,
         pending: pending.length,
+        dmRetries: retries.length,
         failed,
       },
       "Process missed comments: run finished",
@@ -217,6 +244,71 @@ async function findMisjudgedMessengerComments(props: {
     }
     return [
       {
+        integrationIdentifier: pageId,
+        commentData: {
+          commentId: String(row.commentId),
+          postId,
+          parentId: postId,
+          fromId: String(row.fromId),
+          fromName: row.fromName ? String(row.fromName) : undefined,
+          message: row.commentText ? String(row.commentText) : undefined,
+          createdTime: Math.floor(
+            new Date(String(row.occurredAt)).getTime() / 1000,
+          ),
+        },
+      },
+    ]
+  })
+}
+
+/**
+ * Meta errors that pass on their own: the Page's temporary messaging
+ * restriction and Meta's own unexplained failures. Anything else (already
+ * replied, thread archived, private replies not allowed) would fail again.
+ */
+const RETRYABLE_DM_ERRORS = [
+  "%1893063%",
+  "%(#1) An unknown error%",
+  "%Unexpected internal error%",
+]
+
+/**
+ * Comments this automation answered whose DM failed with a retryable error,
+ * rebuilt from the event and the commenter's inbox like
+ * `findMisjudgedMessengerComments`.
+ */
+async function findRetryableFailedDms(props: {
+  workspaceId: string
+  automationId: string
+  since: Date
+}): Promise<ReplayItem[]> {
+  const result = await db.execute(sql`
+    SELECT e."id", e."commentId", e."postId", e."commentText", e."occurredAt",
+      ci."sourceId" AS "fromId", c."fullName" AS "fromName"
+    FROM "CommentAutomationEvent" e
+    JOIN "ContactInbox" ci ON ci."id" = e."contactInboxId"
+    LEFT JOIN "Contact" c ON c."id" = e."contactId"
+    WHERE e."workspaceId" = ${props.workspaceId}
+      AND e."automationId" = ${props.automationId}
+      AND e."replyChannel" = 'private'
+      AND e."status" = 'failed'
+      AND e."occurredAt" >= ${props.since}
+      AND (${sql.join(
+        RETRYABLE_DM_ERRORS.map(
+          (pattern) => sql`e."errorDetail" LIKE ${pattern}`,
+        ),
+        sql` OR `,
+      )})
+  `)
+  return (result.rows as Record<string, unknown>[]).flatMap((row) => {
+    const postId = String(row.postId)
+    const pageId = postId.split("_")[0]
+    if (!(pageId && row.fromId)) {
+      return []
+    }
+    return [
+      {
+        retryEventId: String(row.id),
         integrationIdentifier: pageId,
         commentData: {
           commentId: String(row.commentId),
@@ -299,7 +391,7 @@ async function enqueueReplays(props: {
   workspaceId: string
   automationId: string
   channelType: CommentAutomationType
-  comments: ScannedComment[]
+  comments: ReplayItem[]
 }): Promise<{ failed: number; lastDelayMs: number }> {
   const { workspaceId, automationId, channelType, comments } = props
 
@@ -324,11 +416,17 @@ async function enqueueReplays(props: {
             integrationType: channelType,
             integrationIdentifier,
             commentData: comment.commentData,
-            replay: { automationId },
+            replay: comment.retryEventId
+              ? { automationId, retryPrivateOnly: true }
+              : { automationId },
           },
         },
         opts: {
-          jobId: `missed-comment-${automationId}-${comment.commentData.commentId}`,
+          // A retry keys on the failed row: a later failure is a new row, so
+          // the next run may try again, while a queued retry is not doubled.
+          jobId: comment.retryEventId
+            ? `retry-dm-${automationId}-${comment.retryEventId}`
+            : `missed-comment-${automationId}-${comment.commentData.commentId}`,
           delay: firstDelay + index * MISSED_COMMENTS_REPLAY_SPACING_MS,
           attempts: 1,
         },
@@ -342,10 +440,8 @@ async function enqueueReplays(props: {
   return { failed, lastDelayMs }
 }
 
-function groupByIntegration(
-  comments: ScannedComment[],
-): Map<string, ScannedComment[]> {
-  const groups = new Map<string, ScannedComment[]>()
+function groupByIntegration(comments: ReplayItem[]): Map<string, ReplayItem[]> {
+  const groups = new Map<string, ReplayItem[]>()
   for (const comment of comments) {
     const group = groups.get(comment.integrationIdentifier)
     if (group) {

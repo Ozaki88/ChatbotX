@@ -2028,6 +2028,7 @@ export const receiveComment = async (
       processCommentAutomation({
         ...automationData,
         onlyAutomationId: replay.automationId,
+        retryPrivateOnly: replay.retryPrivateOnly,
       }),
     )
     return

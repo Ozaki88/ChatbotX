@@ -501,6 +501,27 @@ class CommentAutomationService extends BaseService {
   }
 
   /**
+   * Drops a comment's failed DM row so a retry can record its own outcome —
+   * the event table holds one row per comment and reply channel. A sent row
+   * is never touched.
+   */
+  async deleteFailedPrivateEvent(props: {
+    automationId: string
+    commentId: string
+  }): Promise<void> {
+    await db
+      .delete(commentAutomationEventModel)
+      .where(
+        and(
+          eq(commentAutomationEventModel.automationId, props.automationId),
+          eq(commentAutomationEventModel.commentId, props.commentId),
+          eq(commentAutomationEventModel.replyChannel, "private"),
+          eq(commentAutomationEventModel.status, "failed"),
+        ),
+      )
+  }
+
+  /**
    * Loads an automation for "process missed comments" and says why it cannot
    * run, if it cannot. A run outside the automation's schedule is refused up
    * front: every replayed comment would be declined as `outsideSchedule`, and

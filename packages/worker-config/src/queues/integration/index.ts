@@ -186,7 +186,7 @@ export type IntegrationJobReceiveComment = {
      * channel's comment list rather than a webhook, and only this automation
      * runs on it. Absent on every webhook-driven comment.
      */
-    replay?: { automationId: string }
+    replay?: { automationId: string; retryPrivateOnly?: boolean }
   }
 }
 
@@ -932,6 +932,8 @@ export type IntegrationJobProcessCommentAutomation = {
      * every other active automation on the channel. Absent on webhook comments.
      */
     onlyAutomationId?: string
+    /** With `onlyAutomationId`: resend a failed DM only (see the low job). */
+    retryPrivateOnly?: boolean
   }
 }
 

@@ -78,7 +78,12 @@ export type LowJobReplayMissedComment = {
   type: typeof LowJobAction.replayMissedComment
   data: IntegrationJobReceiveComment["data"] & {
     workspaceId: string
-    replay: { automationId: string }
+    /**
+     * `retryPrivateOnly`: the comment was answered but its DM failed for a
+     * passing reason (Meta's temporary messaging restriction). Resend the DM
+     * only — no second public reply, like or hide.
+     */
+    replay: { automationId: string; retryPrivateOnly?: boolean }
   }
 }
 

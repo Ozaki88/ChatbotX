@@ -139,6 +139,7 @@ export async function processCommentAutomation(
     createdTime,
     isLive = false,
     onlyAutomationId,
+    retryPrivateOnly = false,
   } = data
 
   // When the customer commented, not when this job runs — `replyAfter` can put
@@ -398,7 +399,7 @@ export async function processCommentAutomation(
         }
       }
 
-      if (automation.options.replyToNewContactsOnly) {
+      if (automation.options.replyToNewContactsOnly && !retryPrivateOnly) {
         const priorCount =
           await commentAutomationService.getPriorContactInboxCount({
             contactId: contactInbox.contactId,
@@ -416,7 +417,7 @@ export async function processCommentAutomation(
         }
       }
 
-      if (automation.options.replyOncePerUserPerPost) {
+      if (automation.options.replyOncePerUserPerPost && !retryPrivateOnly) {
         const existing = await commentAutomationService.findDedup({
           automationId: automation.id,
           contactId: contactInbox.contactId,
@@ -435,7 +436,10 @@ export async function processCommentAutomation(
         }
       }
 
-      if (!automation.options.replyToUsersWhoCommentedOnOtherPosts) {
+      if (
+        !automation.options.replyToUsersWhoCommentedOnOtherPosts &&
+        !retryPrivateOnly
+      ) {
         const repliedElsewhere =
           await commentAutomationService.hasRepliedOnOtherPost({
             automationId: automation.id,
@@ -459,7 +463,7 @@ export async function processCommentAutomation(
       // accurate; THIS insert is what actually enforces "once per user per
       // post". Two comments from one person milliseconds apart both pass the
       // read, and only one of them can win the row.
-      if (automation.options.replyOncePerUserPerPost) {
+      if (automation.options.replyOncePerUserPerPost && !retryPrivateOnly) {
         dedupClaimed = await commentAutomationService.claimDedup({
           automationId: automation.id,
           contactId: contactInbox.contactId,
@@ -487,7 +491,7 @@ export async function processCommentAutomation(
       let parentMessageId: string | null = null
       let parentMessageCreatedAt: Date | null = null
 
-      if (dbMessage) {
+      if (dbMessage && !retryPrivateOnly) {
         parentMessageId = dbMessage.id
         parentMessageCreatedAt = dbMessage.createdAt
         const conversationRef = {
@@ -577,7 +581,7 @@ export async function processCommentAutomation(
             })
           }
         }
-      } else {
+      } else if (!dbMessage) {
         // Liking, hiding and parent threading all hang off the incoming
         // comment's message row. Losing it degrades all three without touching
         // the reply — which used to happen with no trace at all.
@@ -610,24 +614,33 @@ export async function processCommentAutomation(
       // moves once something actually went out.
       let privateDeferred = false
 
-      try {
-        publicOutcome = await executePublicReply(automation.publicReply, {
-          auth,
+      if (retryPrivateOnly) {
+        await commentAutomationService.deleteFailedPrivateEvent({
           automationId: automation.id,
-          integrationType,
-          integrationIdentifier,
           commentId,
-          channelType,
-          conversationId,
-          contactInboxId,
-          delay,
-          workspaceId,
-          contactInbox,
-          message,
-          parentMessageId,
-          parentMessageCreatedAt,
-          dedup,
         })
+      }
+
+      try {
+        publicOutcome = retryPrivateOnly
+          ? null
+          : await executePublicReply(automation.publicReply, {
+              auth,
+              automationId: automation.id,
+              integrationType,
+              integrationIdentifier,
+              commentId,
+              channelType,
+              conversationId,
+              contactInboxId,
+              delay,
+              workspaceId,
+              contactInbox,
+              message,
+              parentMessageId,
+              parentMessageCreatedAt,
+              dedup,
+            })
       } catch (err) {
         logger.error(
           { err, automationId: automation.id, commentId },
@@ -887,7 +900,7 @@ export async function processCommentAutomation(
       const replyCounts = supportsPrivateReply(channelType)
         ? privateOutcome !== null
         : publicOutcome !== null
-      if (replyCounts) {
+      if (replyCounts && !retryPrivateOnly) {
         await commentAutomationService.incrementRepliesCount(automation.id)
       }
     } catch (err) {
