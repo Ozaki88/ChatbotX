@@ -437,8 +437,10 @@ export async function processCommentAutomation(
       }
 
       if (
-        !automation.options.replyToUsersWhoCommentedOnOtherPosts &&
-        !retryPrivateOnly
+        !(
+          automation.options.replyToUsersWhoCommentedOnOtherPosts ||
+          retryPrivateOnly
+        )
       ) {
         const repliedElsewhere =
           await commentAutomationService.hasRepliedOnOtherPost({
