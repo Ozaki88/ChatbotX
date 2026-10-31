@@ -246,6 +246,10 @@ export default function ConversationItem({
     brand,
   )
   const callPreviewKind = resolveCallPreviewKind(conversation.messages?.[0])
+  // The row leads with what the person said; when the last message is ours
+  // that is noted after it, instead of repeating Freya's own text in every row.
+  const personPreview = conversation.personPreview ?? null
+  const lastIsOurs = conversation.messages?.[0]?.messageType === "outgoing"
   const CallPreviewIcon = callPreviewKind
     ? CALL_PREVIEW_ICON_BY_KIND[callPreviewKind]
     : undefined
@@ -385,7 +389,10 @@ export default function ConversationItem({
             {CallPreviewIcon && (
               <CallPreviewIcon aria-hidden className="size-3 shrink-0" />
             )}
-            <span className="truncate">{previewText}</span>
+            <span className="truncate">{personPreview ?? previewText}</span>
+            {personPreview && lastIsOurs ? (
+              <span className="shrink-0 text-neutral-400">· Freya replied</span>
+            ) : null}
           </div>
           <div className="flex items-center justify-between gap-1 text-xs">
             <div className="flex min-w-0 items-center gap-1">

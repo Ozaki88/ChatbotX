@@ -4,6 +4,7 @@ import {
 } from "@chatbotx.io/business"
 import { resolveAdReferral } from "@chatbotx.io/business/ads-conversion/channel-fields"
 import { notFoundException } from "@chatbotx.io/business/errors"
+import { db, sql } from "@chatbotx.io/database/client"
 import { resolveGoogleAdsClick } from "@chatbotx.io/business/google-ads/click-fields"
 import {
   contactInboxOperationalColumns,
@@ -163,6 +164,16 @@ export const listConversations = async (
     page.map((c, index) => [c.id, lastMessagesResults[index]?.[0] ?? null]),
   )
 
+  const personPreviewByConversationId = await resolvePersonPreviews(
+    page.map((c) => ({
+      id: c.id,
+      contactRepliedAt: c.contactRepliedAt,
+      contactInboxIds: c.contactInboxes.map((inbox) => inbox.id),
+    })),
+    workspaceId,
+    messageRepository,
+  )
+
   // ── Build cursor pagination response ────────────────────────────────────
   const lastItem = page.at(-1)
   const nextCursor =
@@ -195,12 +206,88 @@ export const listConversations = async (
           assignedUser: c.assignedUser ?? null,
           assignedInboxTeam: c.assignedInboxTeam ?? null,
           messages: lastMessage ? [lastMessage] : [],
+          personPreview: personPreviewByConversationId.get(c.id) ?? null,
         }
       }),
     ),
     nextCursor,
     prevCursor,
   }
+}
+
+/**
+ * The person's own last words for the list row: their last DM, or, for the
+ * many threads where Freya's comment DM is the only message, the comment
+ * that started it. Without this every row showed the same recipe text and
+ * the list said nothing about who was on the other end.
+ */
+async function resolvePersonPreviews(
+  rows: {
+    id: string
+    contactRepliedAt: Date | null
+    contactInboxIds: string[]
+  }[],
+  workspaceId: string,
+  messageRepository: Awaited<ReturnType<typeof createMessageRepository>>,
+): Promise<Map<string, string>> {
+  const previews = new Map<string, string>()
+
+  // `contactRepliedAt` is the conversation's own record of the person's last
+  // message, so it is a safe lower bound for the sharded lookup and skips the
+  // lookup entirely where they never wrote.
+  const lastIncoming = await Promise.all(
+    rows.map((row) =>
+      row.contactRepliedAt
+        ? messageRepository.findLastByConversation(row.id, {
+            attachmentCountOnly: true,
+            limit: 1,
+            messageTypes: ["incoming"],
+            sinceTime: resolveLastMessageSinceTime(row.contactRepliedAt),
+            workspaceId,
+          })
+        : Promise.resolve([]),
+    ),
+  )
+  rows.forEach((row, index) => {
+    const text = lastIncoming[index]?.[0]?.text?.trim()
+    if (text) {
+      previews.set(row.id, text)
+    }
+  })
+
+  const needComment = rows.filter((row) => !previews.has(row.id))
+  const inboxIds = needComment.flatMap((row) => row.contactInboxIds)
+  if (inboxIds.length === 0) {
+    return previews
+  }
+  const result = await db.execute(sql`
+    SELECT DISTINCT ON ("contactInboxId") "contactInboxId"::text AS "contactInboxId", "text"
+    FROM "Message"
+    WHERE "workspaceId" = ${workspaceId}
+      AND "contactInboxId" IN (${sql.join(
+        inboxIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})
+      AND "type" = 'comment'
+      AND "messageType" = 'incoming'
+      AND "text" IS NOT NULL
+    ORDER BY "contactInboxId", "createdAt" DESC
+  `)
+  const commentByInbox = new Map(
+    (result.rows as { contactInboxId: string; text: string }[]).map((r) => [
+      r.contactInboxId,
+      r.text,
+    ]),
+  )
+  for (const row of needComment) {
+    const text = row.contactInboxIds
+      .map((id) => commentByInbox.get(id)?.trim())
+      .find((value) => value)
+    if (text) {
+      previews.set(row.id, `Commented: ${text}`)
+    }
+  }
+  return previews
 }
 
 // ── Find single conversation ──────────────────────────────────────────────────

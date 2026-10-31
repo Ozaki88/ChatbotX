@@ -83,6 +83,8 @@ export const listConversationsItemResource = conversationResource.and(
   z.object({
     contactInboxes: z.array(conversationContactInboxResource),
     messages: z.array(messageResourceWithRelations),
+    /** The person's last words (DM or the comment that started it). */
+    personPreview: z.string().nullable().optional(),
     contact: contactResource.nullable(),
     assignedUser: userResource.nullable(),
     assignedInboxTeam: inboxTeamResource.nullable(),
