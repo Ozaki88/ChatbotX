@@ -670,6 +670,22 @@ export const registerSchedules = async () => {
     },
   )
 
+  // Freya fork: 9 am in the workspace's own time zone.
+  await scheduleQueue.upsertJobScheduler(
+    ScheduleJobData.freyaMorningSummary,
+    {
+      pattern: "0 9 * * *",
+      tz: process.env.FREYA_SUMMARY_TIMEZONE ?? "America/Chicago",
+    },
+    {
+      name: ScheduleJobData.freyaMorningSummary,
+      data: {
+        type: ScheduleJobData.freyaMorningSummary,
+        data: {},
+      },
+    },
+  )
+
   await scheduleQueue.upsertJobScheduler(
     ScheduleJobData.sweepStaleWhatsappCalls,
     {

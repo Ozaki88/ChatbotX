@@ -25,6 +25,7 @@ import { enqueueRecurringBroadcasts } from "./handlers/enqueue-recurring-broadca
 import { expireUnpaidOrders } from "./handlers/expire-unpaid-orders"
 import { finalizeBroadcasts } from "./handlers/finalize-broadcasts"
 import { finalizeMarketingMessages } from "./handlers/finalize-marketing-messages"
+import { freyaMorningSummary } from "./handlers/freya-morning-summary"
 import {
   googleAdsHousekeeping,
   googleAdsSyncSetups,
@@ -255,6 +256,10 @@ async function startScheduleWorker() {
 
             case ScheduleJobData.purgeCommentAutomationEvents:
               await purgeCommentAutomationEvents()
+              return
+
+            case ScheduleJobData.freyaMorningSummary:
+              await freyaMorningSummary()
               return
 
             case ScheduleJobData.purgeExpiredCallRecordings:

@@ -58,6 +58,7 @@ export const ScheduleJobData = {
   teardownExpiredTrial: "teardownExpiredTrial",
   // WhatsApp calling.
   purgeExpiredCallRecordings: "purgeExpiredCallRecordings",
+  freyaMorningSummary: "freyaMorningSummary",
   sweepStaleWhatsappCalls: "sweepStaleWhatsappCalls",
   dispatchProfileSnapshots: "dispatchProfileSnapshots",
 } as const
@@ -366,6 +367,12 @@ export type ScheduleJobPurgeExpiredCallRecordings = {
   data: Record<string, never>
 }
 
+/** Freya fork: yesterday's numbers as one phone push every morning. */
+export type ScheduleJobFreyaMorningSummary = {
+  type: typeof ScheduleJobData.freyaMorningSummary
+  data: Record<string, never>
+}
+
 /** Every 5 minutes: `ringing` call rows older than 90s that were never finalized -> `failed`. */
 export type ScheduleJobSweepStaleWhatsappCalls = {
   type: typeof ScheduleJobData.sweepStaleWhatsappCalls
@@ -436,6 +443,7 @@ export type ScheduleJobData =
   | ScheduleJobUnsubscribeExpiredTrials
   | ScheduleJobTeardownExpiredTrial
   | ScheduleJobPurgeExpiredCallRecordings
+  | ScheduleJobFreyaMorningSummary
   | ScheduleJobSweepStaleWhatsappCalls
 
 export const scheduleQueue = isNoRedisEnv()

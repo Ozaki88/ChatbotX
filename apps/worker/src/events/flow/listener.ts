@@ -8,6 +8,7 @@ import {
 } from "@chatbotx.io/analytics"
 import type { FlowEvenTypeMap } from "@chatbotx.io/event-bus"
 import { flowEventTypeSchema } from "@chatbotx.io/flow-config"
+import { scheduleTapFollowUps } from "./tap-follow-up"
 
 export const flowListeners: Partial<FlowEvenTypeMap> = {
   [flowEventTypeSchema.enum["flow:clicked"]]: [
@@ -38,6 +39,10 @@ export const flowListeners: Partial<FlowEvenTypeMap> = {
       handler: commentAutomationAnalyticsService.onClicked.bind(
         commentAutomationAnalyticsService,
       ),
+    },
+    {
+      name: "freya-tap-follow-up",
+      handler: scheduleTapFollowUps,
     },
   ],
   [flowEventTypeSchema.enum["flow:ref"]]: [
