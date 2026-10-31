@@ -19,6 +19,7 @@ import type {
 import { logDiagnostic } from "@chatbotx.io/logger"
 import { createId } from "@chatbotx.io/utils"
 import { toDate } from "../lib/date"
+import { alertFailedDm } from "../lib/failed-dm-alert"
 import { logger } from "../lib/logger"
 import {
   iterateTzDays,
@@ -345,6 +346,16 @@ export class CommentAutomationAnalyticsService {
         "[analytics:commentAutomation] event row written",
       )
       if (
+        input.replyChannel === "private" &&
+        inserted.some((event) => event.status === "failed")
+      ) {
+        alertFailedDm({
+          automationId: input.automationId,
+          commentId: input.commentId,
+          errorDetail: input.errorDetail,
+        })
+      }
+      if (
         !(await this.replyCountsTowardStats({
           automationId: input.automationId,
           replyChannel: input.replyChannel,
@@ -416,6 +427,17 @@ export class CommentAutomationAnalyticsService {
                 input.errorDetail?.slice(0, MAX_ERROR_DETAIL_LENGTH) ?? null,
             }),
       })
+      if (
+        input.status === "failed" &&
+        input.replyChannel === "private" &&
+        settled.length > 0
+      ) {
+        alertFailedDm({
+          automationId: input.automationId,
+          commentId: input.commentId,
+          errorDetail: input.errorDetail,
+        })
+      }
       // Only a settle that actually flipped the row counts: `settleEvent`
       // refuses a second failure, so `failedCount` moves once per reply.
       // Settling back to `sent` (an AI reply landing its text) changes no

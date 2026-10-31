@@ -233,7 +233,7 @@ describe("processMissedComments", () => {
       expect.objectContaining({
         opts: {
           jobId: "missed-comment-automation-1-c-new",
-          delay: 1000,
+          delay: 120_000,
           attempts: 1,
         },
       }),
@@ -241,7 +241,7 @@ describe("processMissedComments", () => {
     expect(mockReserveWindow).toHaveBeenCalledWith({
       channelType: "messenger",
       integrationIdentifier: "page-1",
-      spanMs: 2000,
+      spanMs: 240_000,
     })
     expect(mockReleaseRun).toHaveBeenCalledWith("automation-1")
   })
@@ -264,7 +264,7 @@ describe("processMissedComments", () => {
     expect(mockQueueAddBulk.mock.calls.map((call) => call[0].length)).toEqual([
       500, 500, 1,
     ])
-    expect(enqueuedJobs().at(-1)?.opts.delay).toBe(1_000_000)
+    expect(enqueuedJobs().at(-1)?.opts.delay).toBe(120_000_000)
   })
 
   test("queues behind another run already booked on the same account", async () => {
@@ -277,7 +277,7 @@ describe("processMissedComments", () => {
 
     await processMissedComments(PROPS)
 
-    expect(enqueuedJobs().map((job) => job.opts.delay)).toEqual([5000, 6000])
+    expect(enqueuedJobs().map((job) => job.opts.delay)).toEqual([5000, 125_000])
   })
 
   test("counts the replays before enqueueing them, then settles the count", async () => {
@@ -296,7 +296,7 @@ describe("processMissedComments", () => {
     )
     expect(mockSettleEnqueue).toHaveBeenCalledWith("automation-1", {
       failed: 0,
-      lastDelayMs: 2000,
+      lastDelayMs: 240_000,
     })
   })
 
@@ -310,7 +310,7 @@ describe("processMissedComments", () => {
 
     expect(mockSettleEnqueue).toHaveBeenCalledWith("automation-1", {
       failed: 500,
-      lastDelayMs: 500_000,
+      lastDelayMs: 60_000_000,
     })
   })
 

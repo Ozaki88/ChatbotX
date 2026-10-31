@@ -27,8 +27,12 @@ import {
  * mirrors the one-at-a-time pace of AhaChat's replay; the spacing is booked on
  * the account (`reserveMissedCommentsReplayWindow`), so concurrent runs on one
  * Page share it instead of multiplying it.
+ *
+ * Two minutes apart, not one second: Meta restricted the Facebook Page's
+ * messaging (#10 / 1893063) after a replay sent dozens of identical DMs
+ * within a few minutes. At this pace a backlog reads like a person answering.
  */
-const MISSED_COMMENTS_REPLAY_SPACING_MS = 1000
+const MISSED_COMMENTS_REPLAY_SPACING_MS = 120_000
 
 /** Jobs per `addBulk` call — one Redis round trip per chunk, not per comment. */
 const MISSED_COMMENTS_ENQUEUE_CHUNK_SIZE = 500
