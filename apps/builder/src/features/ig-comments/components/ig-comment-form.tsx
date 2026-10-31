@@ -44,6 +44,7 @@ import {
 } from "@/features/shared/comment-automation/automation-account-field"
 import { ExcludeKeywordsField } from "@/features/shared/comment-automation/exclude-keywords-field"
 import { ReplyTextsField } from "@/features/shared/comment-automation/reply-texts-field"
+import { CommentRulePreview } from "@/features/shared/comment-automation/comment-rule-preview"
 import { ReplyToField } from "@/features/shared/comment-automation/reply-to-field"
 import { useWorkspaceId } from "@/hooks/routing"
 import { useIgCommentPostsStore } from "../provider/ig-comment-posts-store-context"
@@ -215,7 +216,11 @@ export function IgCommentForm({
   )
 
   return (
-    <form className="m-auto w-full max-w-200 space-y-6" onSubmit={onSubmit}>
+    <form
+      className="m-auto flex w-full max-w-300 flex-col gap-6 xl:flex-row xl:items-start"
+      onSubmit={onSubmit}
+    >
+      <div className="min-w-0 flex-1 space-y-6">
       <InputField label={t("fields.name.label")} name="name" required />
 
       <Card>
@@ -588,6 +593,8 @@ export function IgCommentForm({
           {submitLabel}
         </Button>
       </div>
+      </div>
+      <CommentRulePreview channel="instagram" />
     </form>
   )
 }
