@@ -11,6 +11,11 @@ import { SelectField } from "@chatbotx.io/ui/components/form/select-field"
 import { SwitchField } from "@chatbotx.io/ui/components/form/switch-field"
 import { Button } from "@chatbotx.io/ui/components/ui/button"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@chatbotx.io/ui/components/ui/collapsible"
+import {
   Card,
   CardContent,
   CardHeader,
@@ -24,6 +29,7 @@ import {
   FormMessage,
 } from "@chatbotx.io/ui/components/ui/form"
 import { TagsInputField } from "@chatbotx.io/ui/components/ui/muhammada86/tags-input-field"
+import { ChevronDownIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useEffect, useState } from "react"
 import type { UseFormReturn } from "react-hook-form"
@@ -221,6 +227,22 @@ export function IgCommentForm({
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 space-y-4">
+          <ReplyToField
+            labels={{
+              type: t("instagramCommentAutomation.includeKeywordsType"),
+              typeDescription: t(
+                "instagramCommentAutomation.includeKeywordsTypeDescription",
+              ),
+              keywords: t("instagramCommentAutomation.includeKeywords"),
+              keywordsPlaceholder: t(
+                "instagramCommentAutomation.keywordsPlaceholder",
+              ),
+              all: t("instagramCommentAutomation.keywordsType.all"),
+              equal: t("instagramCommentAutomation.keywordsType.equal"),
+              contain: t("instagramCommentAutomation.keywordsType.contain"),
+            }}
+          />
+
           <AutomationAccountField
             findTargetOwner={findPostOwner}
             targetField="post"
@@ -361,26 +383,43 @@ export function IgCommentForm({
         </CardContent>
       </Card>
 
+      {showReplyTiming && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {t("instagramCommentAutomation.card.replyTiming")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SelectField
+              label={t("instagramCommentAutomation.replyAfter")}
+              name="replyAfter.type"
+              options={replyAfterTypeOptions}
+              required
+            />
+            {needsReplyAfterValue && (
+              <InputField
+                label={t("instagramCommentAutomation.replyAfterValue")}
+                min={1}
+                name="replyAfter.value"
+                type="number"
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Collapsible className="space-y-6">
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm font-medium shadow-xs [&[data-state=open]>svg]:rotate-180">
+          Advanced options
+          <ChevronDownIcon className="size-4 transition-transform" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>{t("instagramCommentAutomation.card.filters")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ReplyToField
-            labels={{
-              type: t("instagramCommentAutomation.includeKeywordsType"),
-              typeDescription: t(
-                "instagramCommentAutomation.includeKeywordsTypeDescription",
-              ),
-              keywords: t("instagramCommentAutomation.includeKeywords"),
-              keywordsPlaceholder: t(
-                "instagramCommentAutomation.keywordsPlaceholder",
-              ),
-              all: t("instagramCommentAutomation.keywordsType.all"),
-              equal: t("instagramCommentAutomation.keywordsType.equal"),
-              contain: t("instagramCommentAutomation.keywordsType.contain"),
-            }}
-          />
 
           <ExcludeKeywordsField
             description={t(
@@ -464,31 +503,6 @@ export function IgCommentForm({
         </CardContent>
       </Card>
 
-      {showReplyTiming && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {t("instagramCommentAutomation.card.replyTiming")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <SelectField
-              label={t("instagramCommentAutomation.replyAfter")}
-              name="replyAfter.type"
-              options={replyAfterTypeOptions}
-              required
-            />
-            {needsReplyAfterValue && (
-              <InputField
-                label={t("instagramCommentAutomation.replyAfterValue")}
-                min={1}
-                name="replyAfter.value"
-                type="number"
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {showHideComments && (
         <Card>
@@ -558,6 +572,8 @@ export function IgCommentForm({
           </CardContent>
         </Card>
       )}
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="ghost">

@@ -8,6 +8,11 @@ import { SelectField } from "@chatbotx.io/ui/components/form/select-field"
 import { SwitchField } from "@chatbotx.io/ui/components/form/switch-field"
 import { Button } from "@chatbotx.io/ui/components/ui/button"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@chatbotx.io/ui/components/ui/collapsible"
+import {
   Card,
   CardContent,
   CardHeader,
@@ -21,6 +26,7 @@ import {
   FormMessage,
 } from "@chatbotx.io/ui/components/ui/form"
 import { TagsInputField } from "@chatbotx.io/ui/components/ui/muhammada86/tags-input-field"
+import { ChevronDownIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useEffect, useState } from "react"
 import type { UseFormReturn } from "react-hook-form"
@@ -208,6 +214,22 @@ export function FbCommentForm({
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 space-y-4">
+          <ReplyToField
+            labels={{
+              type: t("facebookCommentAutomation.includeKeywordsType"),
+              typeDescription: t(
+                "facebookCommentAutomation.includeKeywordsTypeDescription",
+              ),
+              keywords: t("facebookCommentAutomation.includeKeywords"),
+              keywordsPlaceholder: t(
+                "facebookCommentAutomation.keywordsPlaceholder",
+              ),
+              all: t("facebookCommentAutomation.keywordsType.all"),
+              equal: t("facebookCommentAutomation.keywordsType.equal"),
+              contain: t("facebookCommentAutomation.keywordsType.contain"),
+            }}
+          />
+
           <AutomationAccountField
             findTargetOwner={findPostOwner}
             targetField="post"
@@ -344,24 +366,39 @@ export function FbCommentForm({
 
       <Card>
         <CardHeader>
+          <CardTitle>
+            {t("facebookCommentAutomation.card.replyTiming")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <SelectField
+            label={t("facebookCommentAutomation.replyAfter")}
+            name="replyAfter.type"
+            options={replyAfterTypeOptions}
+            required
+          />
+          {needsReplyAfterValue && (
+            <InputField
+              label={t("facebookCommentAutomation.replyAfterValue")}
+              min={1}
+              name="replyAfter.value"
+              type="number"
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Collapsible className="space-y-6">
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm font-medium shadow-xs [&[data-state=open]>svg]:rotate-180">
+          Advanced options
+          <ChevronDownIcon className="size-4 transition-transform" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6">
+      <Card>
+        <CardHeader>
           <CardTitle>{t("facebookCommentAutomation.card.filters")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ReplyToField
-            labels={{
-              type: t("facebookCommentAutomation.includeKeywordsType"),
-              typeDescription: t(
-                "facebookCommentAutomation.includeKeywordsTypeDescription",
-              ),
-              keywords: t("facebookCommentAutomation.includeKeywords"),
-              keywordsPlaceholder: t(
-                "facebookCommentAutomation.keywordsPlaceholder",
-              ),
-              all: t("facebookCommentAutomation.keywordsType.all"),
-              equal: t("facebookCommentAutomation.keywordsType.equal"),
-              contain: t("facebookCommentAutomation.keywordsType.contain"),
-            }}
-          />
 
           <ExcludeKeywordsField
             description={t(
@@ -438,29 +475,6 @@ export function FbCommentForm({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {t("facebookCommentAutomation.card.replyTiming")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <SelectField
-            label={t("facebookCommentAutomation.replyAfter")}
-            name="replyAfter.type"
-            options={replyAfterTypeOptions}
-            required
-          />
-          {needsReplyAfterValue && (
-            <InputField
-              label={t("facebookCommentAutomation.replyAfterValue")}
-              min={1}
-              name="replyAfter.value"
-              type="number"
-            />
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -541,6 +555,8 @@ export function FbCommentForm({
           />
         </CardContent>
       </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="ghost">
