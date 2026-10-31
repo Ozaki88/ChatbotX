@@ -748,6 +748,7 @@ function FailuresTable({ rows }: { rows: FreyaStats["failures"] }) {
               last {r.last?.toLocaleDateString() ?? "—"}
             </span>
           </div>
+          {r.meaning && <div className="mt-1 break-words">{r.meaning}</div>}
           <div className="mt-1 break-words text-muted-foreground">
             {r.detail}
           </div>

@@ -459,6 +459,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
     })),
     failures: failures.map((r) => ({
       detail: String(r.detail),
+      meaning: explainFailure(String(r.detail)),
       httpCode: r.httpCode ? String(r.httpCode) : null,
       count: num(r.count),
       last: r.last ? new Date(String(r.last)) : null,
@@ -495,6 +496,30 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       contactId: r.contactId ? String(r.contactId) : null,
     })),
   }
+}
+
+/**
+ * Plain-language meaning of the errors Meta sends most, found by checking the
+ * failed people's real Instagram threads (2026-10-31). "Already has a reply"
+ * is not a race: Instagram allows one private reply per person per post, and
+ * these people had commented on the same viral reel before and got a DM then
+ * (ManyChat era). The person's own "yes" DM reopens the door.
+ */
+function explainFailure(detail: string): string | null {
+  const d = detail.toLowerCase()
+  if (d.includes("already has a reply") || d.includes("already replied")) {
+    return "Repeat commenter: they already got a DM for an earlier comment on this post, and Instagram allows one DM per person per post. They now get the \"DM me YES\" reply instead."
+  }
+  if (d.includes("1893063") || d.includes("temporarily restricted")) {
+    return "Meta has temporarily blocked this Page from messaging (too many identical DMs in a short time). It lifts on its own after a few days."
+  }
+  if (d.includes("2534001") || d.includes("thread does not exist")) {
+    return "This person deleted the chat or can't be messaged by the Page."
+  }
+  if (d.includes("1893062") || d.includes("1893049") || d.includes("cant reply")) {
+    return "This commenter is a Page, not a person, so no DM is possible."
+  }
+  return null
 }
 
 export type FreyaStats = Awaited<ReturnType<typeof getFreyaStats>>
