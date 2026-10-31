@@ -114,8 +114,12 @@ export function buildConversationWhere(
   const tags = input.tags ?? []
   const isArchiveView = tags.includes("archived")
 
+  // DM chats only: a comment thread is its own conversation anchored to the
+  // post (`sourceId` = post id), which listed every commenter twice. Like
+  // ManyChat, the inbox shows one chat per person.
   const where: Record<string, unknown> = {
     workspaceId,
+    sourceId: { isNull: true },
   }
 
   if (!isArchiveView) {

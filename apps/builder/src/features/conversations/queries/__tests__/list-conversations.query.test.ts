@@ -117,6 +117,12 @@ describe("buildConversationWhere channel filter", () => {
     expect(where.contactInboxes).toEqual({ channel: "messenger" })
   })
 
+  test("lists DM chats only, not comment threads", () => {
+    const where = buildConversationWhere("1", baseInput, null)
+
+    expect(where.sourceId).toEqual({ isNull: true })
+  })
+
   test("composes keyword and contact filter OR branches without overwriting either", () => {
     vi.mocked(applyContactFilter).mockReturnValueOnce({
       OR: [{ email: { ilike: "%ada%" } }],
