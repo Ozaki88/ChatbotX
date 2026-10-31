@@ -44,6 +44,34 @@ const toIncomingAttachment = (
   return getMessageAttachmentEntity({ ctx, attachment })
 }
 
+/**
+ * A post or reel shared into the DM arrives as a `share` / `ig_reel`
+ * attachment whose URL is the post's page, not a media file. Downloading it
+ * stored half a megabyte of Instagram's HTML as a "file" and the inbox could
+ * only show a raw link. Shares are kept as a line of text with the link
+ * instead, and never downloaded.
+ */
+const SHARE_ATTACHMENT_TYPES = new Set<string>(["share", "ig_reel"])
+
+const isShareAttachment = (attachment: { type: string }): boolean =>
+  SHARE_ATTACHMENT_TYPES.has(attachment.type)
+
+export const describeSharedPosts = (
+  message: InstagramMessage,
+): string | undefined => {
+  const links = (message.attachments ?? [])
+    .filter((attachment) => isShareAttachment(attachment))
+    .map((attachment) => attachment.payload.url)
+    .filter((url): url is string => Boolean(url))
+  if (links.length === 0) {
+    return
+  }
+  return links
+    .map((url) => `📎 Shared a post: ${url}`)
+    .join("
+")
+}
+
 const getMessageAttachments = async (
   ctx: Context<InstagramAuthValue>,
   message: InstagramMessage,
@@ -54,7 +82,9 @@ const getMessageAttachments = async (
 
   try {
     const attachmentPromises = message.attachments
-      .filter((attachment) => attachment.payload.url)
+      .filter(
+        (attachment) => attachment.payload.url && !isShareAttachment(attachment),
+      )
       .map((attachment) =>
         toIncomingAttachment(ctx, attachment).catch((error) => {
           logger.error("Error processing attachment", error)
@@ -132,7 +162,11 @@ const getMessageEntity = async (
         messaging.sender.id === ctx.auth.metadata.igId
           ? messageTypes.enum.outgoing
           : messageTypes.enum.incoming,
-      text: messaging.message.text,
+      text:
+        [messaging.message.text, describeSharedPosts(messaging.message)]
+          .filter(Boolean)
+          .join("
+") || messaging.message.text,
       contentType: contentTypes.enum.text,
       contentAttributes,
       attachments: await getMessageAttachments(ctx, messaging.message),
