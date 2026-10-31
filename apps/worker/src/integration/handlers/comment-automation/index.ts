@@ -79,6 +79,15 @@ import type { CommentReplyOutcome } from "./reply-outcome"
 export { isCommentReply } from "./automation-matching"
 
 /**
+ * How much later the public reply leaves than the DM. Instagram grants a
+ * comment one private reply and rejects it with "(#-1) The comment you are
+ * trying to reply to, already has a reply" once the Page's own public reply
+ * is under it; both used to share one delay on a `concurrency: 5` queue, so
+ * whichever Meta accepted first won and about a third of DMs were lost.
+ */
+const PUBLIC_REPLY_AFTER_DM_MS = 30_000
+
+/**
  * Everything `processCommentAutomation` needs before it can look at a single
  * automation. Extracted so the caller can wrap exactly this phase in one
  * try/catch — a failure here belongs to the whole comment, not to any one
@@ -635,7 +644,13 @@ export async function processCommentAutomation(
               channelType,
               conversationId,
               contactInboxId,
-              delay,
+              // DM first, so the comment's single private reply is not
+              // spent by our own public reply landing ahead of it.
+              delay:
+                willSendReply(automation.privateReply) &&
+                supportsPrivateReply(channelType)
+                  ? delay + PUBLIC_REPLY_AFTER_DM_MS
+                  : delay,
               workspaceId,
               contactInbox,
               message,

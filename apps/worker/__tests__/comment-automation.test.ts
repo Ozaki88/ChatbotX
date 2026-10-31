@@ -3888,6 +3888,27 @@ describe("processCommentAutomation multi-text public reply", () => {
     expect(delays).toEqual([0, 3000, 6000])
   })
 
+  // Meta grants a comment one private reply and refuses it ("already has a
+  // reply") once the Page's public reply is under the comment, so with a DM
+  // configured the public reply waits for it.
+  test("public reply leaves after the DM when the automation also sends one", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({
+        publicReply: { type: "text", value: "Check your DMs" },
+        privateReply: { type: "text", value: "psst" },
+      }),
+    ])
+    mockContactVariableReplaceAll.mockImplementation(
+      ({ text }: { text: string }) => Promise.resolve(text),
+    )
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(
+      mockChatQueueAdd.mock.calls.map(([, , options]) => options?.delay),
+    ).toContain(30_000)
+  })
+
   test("counts as ONE reply: a single analytics event for the whole set", async () => {
     mockFindActiveAutomations.mockResolvedValue([
       buildAutomation({ publicReply: multiText }),
