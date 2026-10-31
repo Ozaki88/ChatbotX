@@ -25,9 +25,18 @@ export const TAP_FOLLOW_UP_DELAY_MS = 20 * 60 * 1000
 export const TAP_FOLLOW_UP_TEXT =
   "{Did the link open for you, honey? 💛|Just checking the link worked for you, sugar 💛|Let me know if the link gave you any trouble, honey 💛} If not, reply LINK and I'll send it again."
 
+/** Optional: `FREYA_TAP_FOLLOW_UP=off` on the worker switches it off. */
+const isEnabled = () =>
+  !["off", "false", "0"].includes(
+    (process.env.FREYA_TAP_FOLLOW_UP ?? "on").trim().toLowerCase(),
+  )
+
 export async function scheduleTapFollowUps(
   payloads: FlowClickedPayload[],
 ): Promise<void> {
+  if (!isEnabled()) {
+    return
+  }
   for (const payload of payloads) {
     if (!(payload.action.commentAutomationId && payload.context.contactInboxId)) {
       continue
