@@ -54,6 +54,7 @@ import type {
   ChatJobSendTyping,
 } from "@chatbotx.io/worker-config"
 import {
+  resolvePublicReplyFallbackText,
   settleCommentAutomationDelivered,
   settleCommentAutomationFailure,
 } from "../../lib/comment-automation-anchor"
@@ -307,6 +308,30 @@ export async function sendMessageToChannel(
             message.contentAttributes?.postId ??
             null,
         },
+      }
+    }
+
+    // "Check your DMs" leaves 30 s after the DM; if that DM was refused, the
+    // comment gets "DM me YES" instead, and the inbox shows what was posted.
+    if (isPublicComment) {
+      const fallbackText = await resolvePublicReplyFallbackText(
+        message.contentAttributes,
+      )
+      if (fallbackText) {
+        handlerMessage = { ...handlerMessage, text: fallbackText }
+        await messageService
+          .updateText({
+            id: message.id,
+            createdAt: new Date(message.createdAt),
+            workspaceId: conversation.workspaceId,
+            text: fallbackText,
+          })
+          .catch((err) =>
+            logger.warn(
+              { err, messageId: message.id },
+              "Failed to store the DM-failed public reply text",
+            ),
+          )
       }
     }
 

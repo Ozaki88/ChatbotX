@@ -1,5 +1,6 @@
 import { commentAutomationAnalyticsService } from "@chatbotx.io/analytics"
 import type { CommentAutomationReplyChannel } from "@chatbotx.io/database/partials"
+import { applySpintax } from "@chatbotx.io/utils/spintax"
 import { logger } from "./logger"
 
 /**
@@ -46,6 +47,34 @@ export function readCommentAutomationAnchor(
   }
 
   return { automationId, replyChannel, commentId }
+}
+
+/**
+ * What a public reply says instead of "check your DMs" when the DM it points
+ * to was refused (Instagram declines about one private reply in four, and a
+ * restricted Page declines all of them). A DM the person starts themselves is
+ * not a private reply, so the YES keyword rule can answer it.
+ */
+export const DM_FAILED_PUBLIC_REPLY =
+  "{Send me a quick DM saying YES and I'll send it right over 💛|Pop me a DM with YES, honey, and it's all yours 💛|DM me YES and I'll send it straight to you 💛}"
+
+/**
+ * The text a public comment-automation reply should carry at send time: the
+ * fallback when the same automation's DM to this comment failed, otherwise
+ * `null` (send as written). Only public replies are touched.
+ */
+export async function resolvePublicReplyFallbackText(
+  contentAttributes: MessageLikeContentAttributes | undefined,
+): Promise<string | null> {
+  const anchor = readCommentAutomationAnchor(contentAttributes)
+  if (!anchor || anchor.replyChannel !== "public") {
+    return null
+  }
+
+  const failed = await commentAutomationAnalyticsService.hasFailedPrivateReply(
+    { automationId: anchor.automationId, commentId: anchor.commentId },
+  )
+  return failed ? applySpintax(DM_FAILED_PUBLIC_REPLY) : null
 }
 
 /**
