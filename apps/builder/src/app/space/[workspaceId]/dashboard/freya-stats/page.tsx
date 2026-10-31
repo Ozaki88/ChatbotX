@@ -128,49 +128,39 @@ export default async function FreyaStatsPage({
     <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <AnalyticsNav adsChannels={adsChannels} showGoogleAds={showGoogleAds} />
       <div className="flex min-w-0 flex-1 flex-col gap-5">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-semibold text-2xl tracking-tight">
-              Freya stats
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Every comment, DM, tap and Amazon click from your automations ·{" "}
-              {FREYA_STATS_RANGES[range].label.toLowerCase()} · times in{" "}
-              {stats.timezone}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Pills
-              current={channel}
-              items={Object.entries(FREYA_STATS_CHANNELS).map(([key, v]) => ({
-                key,
-                label: v.label,
-                href: href({ channel: key }),
-              }))}
-            />
-            <Pills
-              current={range}
-              items={Object.entries(FREYA_STATS_RANGES).map(([key, v]) => ({
-                key,
-                label: v.label,
-                href: href({ range: key }),
-              }))}
-            />
-          </div>
-        </header>
-
-        {stats.errors.length > 0 ? (
-          <div className="rounded-xl border border-destructive/50 p-3 text-destructive text-xs">
-            Some sections could not load:
-            <ul className="mt-1 list-disc pl-4">
-              {stats.errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <Hero
+          channel={channel}
+          href={href}
+          range={range}
+          stats={stats}
+          workspaceId={workspaceId}
+        />
 
         <Kpis stats={stats} />
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <Section
+            hint="What Instagram/Facebook answered when a DM didn't go through, in plain words."
+            title="Why DMs failed"
+          >
+            <FailuresTable rows={stats.failures} />
+          </Section>
+          <Section
+            hint="Comments no automation answered, and why."
+            title="Not answered"
+          >
+            <BarList
+              empty="Every comment was answered."
+              items={stats.missReasons.map((m) => ({
+                label: MISS_REASON_LABELS[m.reason] ?? m.reason,
+                value: m.count,
+                color: MUTED_BAR,
+              }))}
+            />
+          </Section>
+        </div>
+
+        <h2 className="mt-2 font-semibold text-lg tracking-tight">Details</h2>
 
         <div className="grid grid-cols-1 gap-5 2xl:grid-cols-5">
           <div className="2xl:col-span-3">
@@ -243,35 +233,13 @@ export default async function FreyaStatsPage({
               }))}
             />
           </Section>
-          <div className="flex flex-col gap-5">
-            <Section
-              hint="Comments no automation answered, and why."
-              title="Not answered"
-            >
-              <BarList
-                empty="Every comment was answered."
-                items={stats.missReasons.map((m) => ({
-                  label: MISS_REASON_LABELS[m.reason] ?? m.reason,
-                  value: m.count,
-                  color: MUTED_BAR,
-                }))}
-              />
-            </Section>
-            <Section
-              hint="What Instagram/Facebook answered when a reply didn't go through."
-              title="Why DMs failed"
-            >
-              <FailuresTable rows={stats.failures} />
-            </Section>
-          </div>
+          <Section
+            hint="All DM conversations, not only automations: messages people sent, and replies from the bot (automations + AI agent) and from you."
+            title="Inbox messages"
+          >
+            <InboxTable rows={stats.inbox} />
+          </Section>
         </div>
-
-        <Section
-          hint="All DM conversations, not only automations: messages people sent, and replies from the bot (automations + AI agent) and from you."
-          title="Inbox messages"
-        >
-          <InboxTable rows={stats.inbox} />
-        </Section>
 
         <Section hint="The latest 60 replies sent." title="Live feed">
           <FeedTable rows={stats.feed} />
@@ -328,23 +296,160 @@ function Section({
   )
 }
 
+/**
+ * The home screen: one sentence that says whether the automations worked,
+ * a status line that says what went wrong today and why, and the three
+ * places to act. Everything numeric lives below it.
+ */
+function Hero({
+  stats,
+  range,
+  channel,
+  href,
+  workspaceId,
+}: {
+  stats: FreyaStats
+  range: FreyaStatsRange
+  channel: FreyaStatsChannel
+  href: (next: { range?: string; channel?: string }) => string
+  workspaceId: string
+}) {
+  const t = stats.totals
+  const today = stats.daily[0]
+  const todayFailed = today?.failed ?? 0
+  const todayDelivered = today?.dmDelivered ?? 0
+  // One reason per row, most common first: the status line names the top
+  // two so the fix is known before the table is opened.
+  const topReasons = stats.failures
+    .filter((f) => f.meaning)
+    .slice(0, 2)
+    .map((f) => `${f.count}× ${f.meaning}`)
+  const base = `/space/${workspaceId}`
+  const actions = [
+    { label: "Inbox", hint: "Chats with people", href: `${base}/inbox` },
+    {
+      label: "Comment rules",
+      hint: "What a YES comment triggers",
+      href: `${base}/ig-comments`,
+    },
+    {
+      label: "Keywords",
+      hint: 'What a DM like "yes" triggers',
+      href: `${base}/automated-responses`,
+    },
+  ]
+
+  return (
+    <section
+      className="rounded-2xl border p-5 shadow-xs"
+      style={{
+        background: `linear-gradient(135deg, ${SAGE_SOFT}, transparent 60%)`,
+      }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-semibold text-2xl tracking-tight">
+            Freya, {FREYA_STATS_RANGES[range].label.toLowerCase()}
+          </h1>
+          <p className="mt-1 text-muted-foreground text-sm">
+            Times in {stats.timezone}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Pills
+            current={channel}
+            items={Object.entries(FREYA_STATS_CHANNELS).map(([key, v]) => ({
+              key,
+              label: v.label,
+              href: href({ channel: key }),
+            }))}
+          />
+          <Pills
+            current={range}
+            items={Object.entries(FREYA_STATS_RANGES).map(([key, v]) => ({
+              key,
+              label: v.label,
+              href: href({ range: key }),
+            }))}
+          />
+        </div>
+      </div>
+
+      <p className="mt-5 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-semibold text-xl sm:text-2xl">
+        <Big n={t.comments} /> comments
+        <Arrow />
+        <Big n={t.dmDelivered} /> DMs delivered
+        <Arrow />
+        <Big n={t.tapped} /> taps
+        <Arrow />
+        <Big accent n={t.linkClicks} /> Amazon clicks
+      </p>
+
+      <div
+        className="mt-4 rounded-xl border px-4 py-3 text-sm"
+        style={{
+          borderColor: todayFailed > 0 ? HONEY : SAGE,
+          backgroundColor:
+            todayFailed > 0 ? "rgba(224, 168, 74, 0.12)" : SAGE_SOFT,
+        }}
+      >
+        <div className="font-medium">
+          {todayFailed > 0
+            ? `Today: ${todayDelivered} DMs delivered, ${todayFailed} didn't go out`
+            : `Today: ${todayDelivered} DMs delivered, none failed`}
+        </div>
+        {topReasons.length > 0 && todayFailed > 0 ? (
+          <ul className="mt-1 text-muted-foreground text-xs">
+            {topReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {actions.map((action) => (
+          <Link
+            className="rounded-xl border bg-card px-4 py-3 shadow-xs transition-colors hover:bg-accent"
+            href={action.href}
+            key={action.href}
+          >
+            <div className="font-semibold">{action.label}</div>
+            <div className="text-muted-foreground text-xs">{action.hint}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function Big({ n, accent }: { n: number; accent?: boolean }) {
+  return (
+    <span
+      className="text-3xl tabular-nums sm:text-4xl"
+      style={{ color: accent ? HONEY : SAGE }}
+    >
+      {n.toLocaleString()}
+    </span>
+  )
+}
+
+function Arrow() {
+  return <span className="text-muted-foreground">→</span>
+}
+
 function Kpis({ stats }: { stats: FreyaStats }) {
   const t = stats.totals
   const items = [
     {
       label: "Comments",
       value: t.comments,
-      sub: `${t.answered} answered · ${t.unanswered} not`,
+      sub: `${t.answered} answered · ${t.unanswered} no keyword`,
     },
     {
-      label: "DMs sent",
-      value: t.dmSent,
-      sub: `to ${t.peopleReached} people`,
-    },
-    {
-      label: "Delivered",
+      label: "DMs delivered",
       value: t.dmDelivered,
-      sub: `${pct(t.dmDelivered, t.dmSent)} of sent`,
+      sub: `to ${t.peopleReached} people`,
     },
     {
       label: "Seen",
@@ -357,26 +462,20 @@ function Kpis({ stats }: { stats: FreyaStats }) {
       sub: `${pct(t.tapped, t.dmDelivered)} of delivered`,
     },
     {
-      label: "Link clicks",
+      label: "Amazon clicks",
       value: t.linkClicks,
       sub: `${t.linkPeople} people`,
       accent: HONEY,
     },
     {
-      label: "Failed",
+      label: "DMs failed",
       value: t.failed,
       sub: `${pct(t.failed, t.dmSent + t.failed)} of attempts`,
+      accent: t.failed > 0 ? HONEY : undefined,
     },
-    {
-      label: "Public replies",
-      value: t.publicReplies,
-      sub: "under comments",
-    },
-    { label: "New contacts", value: t.newContacts, sub: "in this period" },
-    { label: "Tapped gummies", value: t.tappedTag, sub: "tag · all time" },
   ]
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map((item) => (
         <div
           className="rounded-xl border bg-card p-3 shadow-xs"
@@ -384,7 +483,7 @@ function Kpis({ stats }: { stats: FreyaStats }) {
           style={{ borderTop: `3px solid ${item.accent ?? SAGE}` }}
         >
           <div className="text-muted-foreground text-xs">{item.label}</div>
-          <div className="font-semibold text-2xl tabular-nums">
+          <div className="font-semibold text-3xl tabular-nums">
             {item.value.toLocaleString()}
           </div>
           <div className="text-muted-foreground text-xs">{item.sub}</div>
