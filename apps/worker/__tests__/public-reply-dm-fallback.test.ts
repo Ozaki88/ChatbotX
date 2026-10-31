@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest"
 
-const mockHasFailedPrivateReply = vi.fn()
+const mockFindFailedPrivateReplyError = vi.fn()
 
 vi.mock("@chatbotx.io/analytics", () => ({
   commentAutomationAnalyticsService: {
-    hasFailedPrivateReply: mockHasFailedPrivateReply,
+    findFailedPrivateReplyError: mockFindFailedPrivateReplyError,
   },
 }))
 
@@ -23,20 +23,33 @@ describe("resolvePublicReplyFallbackText", () => {
   })
 
   test("asks for a DM when the comment's DM failed", async () => {
-    mockHasFailedPrivateReply.mockResolvedValue(true)
+    mockFindFailedPrivateReplyError.mockResolvedValue(
+      "(#10 - 1893063) temporarily restricted",
+    )
 
     const text = await resolvePublicReplyFallbackText(publicAttributes)
 
     expect(text).toMatch(/DM/)
     expect(text).not.toMatch(/[{}|]/)
-    expect(mockHasFailedPrivateReply).toHaveBeenCalledWith({
+    expect(mockFindFailedPrivateReplyError).toHaveBeenCalledWith({
       automationId: "a1",
       commentId: "c1",
     })
   })
 
+  test("points a repeat commenter at the DM they already have", async () => {
+    mockFindFailedPrivateReplyError.mockResolvedValue(
+      "(#-1) The comment you are trying to reply to, already has a reply.",
+    )
+
+    const text = await resolvePublicReplyFallbackText(publicAttributes)
+
+    expect(text).toMatch(/already/i)
+    expect(text).not.toMatch(/[{}|]/)
+  })
+
   test("keeps the configured reply when the DM did not fail", async () => {
-    mockHasFailedPrivateReply.mockResolvedValue(false)
+    mockFindFailedPrivateReplyError.mockResolvedValue(null)
 
     expect(await resolvePublicReplyFallbackText(publicAttributes)).toBeNull()
   })
@@ -49,6 +62,6 @@ describe("resolvePublicReplyFallbackText", () => {
       }),
     ).toBeNull()
     expect(await resolvePublicReplyFallbackText(null)).toBeNull()
-    expect(mockHasFailedPrivateReply).not.toHaveBeenCalled()
+    expect(mockFindFailedPrivateReplyError).not.toHaveBeenCalled()
   })
 })

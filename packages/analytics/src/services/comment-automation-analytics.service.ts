@@ -469,17 +469,18 @@ export class CommentAutomationAnalyticsService {
   }
 
   /**
-   * Whether the DM this automation sent for the comment failed. Read by the
-   * chat worker just before the public reply leaves (30 s after the DM), so
-   * "check your DMs" is never posted under a comment whose DM never arrived.
-   * A lookup failure answers `false`: the reply goes out as configured.
+   * Meta's error for the DM this automation sent for the comment, or `null`
+   * when it did not fail. Read by the chat worker just before the public reply
+   * leaves (30 s after the DM), so "check your DMs" is never posted under a
+   * comment whose DM never arrived, and the reply can say why. A lookup
+   * failure answers `null`: the reply goes out as configured.
    */
-  async hasFailedPrivateReply(input: {
+  async findFailedPrivateReplyError(input: {
     automationId: string
     commentId: string
-  }): Promise<boolean> {
+  }): Promise<string | null> {
     try {
-      return await commentAutomationStatsRepository.hasFailedPrivateReply(
+      return await commentAutomationStatsRepository.findFailedPrivateReplyError(
         input,
       )
     } catch (err) {
@@ -487,7 +488,7 @@ export class CommentAutomationAnalyticsService {
         { err, ...input },
         "[analytics:commentAutomation] failed to read private reply status",
       )
-      return false
+      return null
     }
   }
 

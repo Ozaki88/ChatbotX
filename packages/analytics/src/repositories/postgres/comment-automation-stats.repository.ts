@@ -138,20 +138,21 @@ export class CommentAutomationStatsRepository extends BaseRepository {
    *
    * Returns the automation ids whose rows actually changed.
    */
-  /** Whether this automation's DM to the comment ended `failed`. */
-  async hasFailedPrivateReply(input: {
+  /** The error of this automation's DM to the comment, if it ended `failed`. */
+  async findFailedPrivateReplyError(input: {
     automationId: string
     commentId: string
-  }): Promise<boolean> {
+  }): Promise<string | null> {
     const result = await db.execute(sql`
-      SELECT 1 FROM "CommentAutomationEvent"
+      SELECT COALESCE("errorDetail", '') AS "errorDetail" FROM "CommentAutomationEvent"
       WHERE "automationId" = ${input.automationId}
         AND "commentId" = ${input.commentId}
         AND "replyChannel" = 'private'::"commentAutomationReplyChannel"
         AND "status" = 'failed'::"commentAutomationEventStatus"
       LIMIT 1
     `)
-    return result.rows.length > 0
+    const row = result.rows[0] as { errorDetail: string } | undefined
+    return row ? row.errorDetail : null
   }
 
   async settleEvent(input: {

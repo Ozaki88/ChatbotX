@@ -51,12 +51,29 @@ export function readCommentAutomationAnchor(
 
 /**
  * What a public reply says instead of "check your DMs" when the DM it points
- * to was refused (Instagram declines about one private reply in four, and a
- * restricted Page declines all of them). A DM the person starts themselves is
- * not a private reply, so the YES keyword rule can answer it.
+ * to was refused (a restricted Page declines all of them). A DM the person
+ * starts themselves is not a private reply, so the YES keyword rule can
+ * answer it.
  */
 export const DM_FAILED_PUBLIC_REPLY =
   "{Send me a quick DM saying YES and I'll send it right over 💛|Pop me a DM with YES, honey, and it's all yours 💛|DM me YES and I'll send it straight to you 💛}"
+
+/**
+ * Instagram's "already has a reply" is a repeat commenter: they commented on
+ * this post before and got the DM then (Instagram allows one private reply per
+ * person per post), so the DM is already sitting in their thread. Verified in
+ * the account's own inbox on 2026-10-31. Pointing them at it beats asking for
+ * a new DM.
+ */
+export const DM_ALREADY_SENT_PUBLIC_REPLY =
+  "{I already sent it to you, honey 💛 it's in your messages (check requests too)|It's already in your DMs from last time, honey 💛 have a look in your message requests|Already sent it to you, sugar 💛 check your messages or requests}"
+
+export const publicReplyForDmError = (errorDetail: string): string =>
+  applySpintax(
+    /already has a reply|already replied/i.test(errorDetail)
+      ? DM_ALREADY_SENT_PUBLIC_REPLY
+      : DM_FAILED_PUBLIC_REPLY,
+  )
 
 /**
  * The text a public comment-automation reply should carry at send time: the
@@ -71,10 +88,12 @@ export async function resolvePublicReplyFallbackText(
     return null
   }
 
-  const failed = await commentAutomationAnalyticsService.hasFailedPrivateReply(
-    { automationId: anchor.automationId, commentId: anchor.commentId },
-  )
-  return failed ? applySpintax(DM_FAILED_PUBLIC_REPLY) : null
+  const error =
+    await commentAutomationAnalyticsService.findFailedPrivateReplyError({
+      automationId: anchor.automationId,
+      commentId: anchor.commentId,
+    })
+  return error === null ? null : publicReplyForDmError(error)
 }
 
 /**
