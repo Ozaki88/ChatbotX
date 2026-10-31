@@ -11,6 +11,8 @@ import {
   AtomIcon,
   BrainIcon,
   ChartPieIcon,
+  FacebookIcon,
+  InstagramIcon,
   ChevronsRight,
   LightbulbIcon,
   type LucideIcon,
@@ -91,8 +93,8 @@ export function AppSidebar({
     },
     navMain: [
       {
-        title: t("fields.analytics.label"),
-        url: `/space/${workspaceId}/dashboard`,
+        title: "Freya stats",
+        url: `/space/${workspaceId}/dashboard/freya-stats`,
         icon: ChartPieIcon,
         permission: PERMISSION_NAV.dashboard,
       },
@@ -132,6 +134,18 @@ export function AppSidebar({
         icon: PhoneCallIcon,
         permission: PERMISSION_NAV.contacts,
         visible: callHistoryNavVisible,
+      },
+      {
+        title: "Instagram comments",
+        url: `/space/${workspaceId}/ig-comments`,
+        icon: InstagramIcon,
+        permission: PERMISSION_NAV.flows,
+      },
+      {
+        title: "Facebook comments",
+        url: `/space/${workspaceId}/fb-comments`,
+        icon: FacebookIcon,
+        permission: PERMISSION_NAV.flows,
       },
       {
         title: t("keywords.title"),
@@ -199,6 +213,24 @@ export function AppSidebar({
       scheduledForDeletion && !item.url.endsWith(SETTINGS_GENERAL_URL_SEGMENT),
   }))
 
+  // The menu reads top-down in the order a day runs: what the automations did,
+  // the chats, then the rules behind them. Everything else is still here, one
+  // group lower, so the fourteen-item wall is gone without hiding a page.
+  const FREYA_SEGMENTS = [
+    "/dashboard/freya-stats",
+    "/inbox",
+    "/ig-comments",
+    "/fb-comments",
+    "/automated-responses",
+    "/flows",
+  ]
+  const segmentIndex = (url: string) =>
+    FREYA_SEGMENTS.findIndex((segment) => url.endsWith(segment))
+  const navFreya = navMain
+    .filter((item) => segmentIndex(item.url) !== -1)
+    .sort((a, b) => segmentIndex(a.url) - segmentIndex(b.url))
+  const navMore = navMain.filter((item) => segmentIndex(item.url) === -1)
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="gap-0 px-0 py-0">
@@ -215,7 +247,13 @@ export function AppSidebar({
       <SidebarContent>
         <NavMain
           disabledTooltip={t("workspace.deletion.navDisabledTooltip")}
-          items={navMain}
+          items={navFreya}
+          label="Freya"
+        />
+        <NavMain
+          disabledTooltip={t("workspace.deletion.navDisabledTooltip")}
+          items={navMore}
+          label="More"
         />
       </SidebarContent>
       <SidebarFooter>

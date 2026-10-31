@@ -444,11 +444,16 @@ function VerticalBars({
   items: { label: string; value: number }[]
 }) {
   const top = Math.max(1, ...items.map((i) => i.value))
+  // 24 hour bars need ~26px each to keep their labels apart, so on a phone the
+  // chart scrolls sideways instead of printing labels on top of each other.
   return (
-    <div className="flex h-40 items-end gap-1">
+    <div
+      className="flex h-40 items-end gap-1 overflow-x-auto"
+      style={{ minWidth: 0 }}
+    >
       {items.map((item) => (
         <div
-          className="flex flex-1 flex-col items-center gap-1"
+          className="flex min-w-6 flex-1 flex-col items-center gap-1"
           key={item.label}
           title={`${item.label}: ${item.value}`}
         >

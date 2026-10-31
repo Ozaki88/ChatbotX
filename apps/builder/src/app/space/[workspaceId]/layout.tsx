@@ -19,6 +19,7 @@ import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ExpiredBanner } from "@/components/expired-banner"
+import { MobileTabBar } from "@/components/mobile-tab-bar"
 import type { QuotaSummary } from "@/components/nav-usage"
 import {
   NavigationPendingBoundary,
@@ -218,6 +219,7 @@ export default async function WorkspaceLayout({
               </CouponTopicStoreProvider>
             </AnalyticsApiProvider>
           </main>
+          <MobileTabBar workspaceId={workspaceId} />
           <SidebarTrigger className="absolute -inset-s-2 top-3 z-10 hidden border md:inline-flex" />
           {/*
           Below `md` the sidebar collapses into a Sheet and `SidebarTrigger`
