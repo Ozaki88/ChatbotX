@@ -11,8 +11,8 @@ import {
   AtomIcon,
   BrainIcon,
   ChartPieIcon,
-  FacebookIcon,
-  InstagramIcon,
+  ThumbsUpIcon,
+  CameraIcon,
   ChevronsRight,
   LightbulbIcon,
   type LucideIcon,
@@ -138,13 +138,13 @@ export function AppSidebar({
       {
         title: "Instagram comments",
         url: `/space/${workspaceId}/ig-comments`,
-        icon: InstagramIcon,
+        icon: CameraIcon,
         permission: PERMISSION_NAV.flows,
       },
       {
         title: "Facebook comments",
         url: `/space/${workspaceId}/fb-comments`,
-        icon: FacebookIcon,
+        icon: ThumbsUpIcon,
         permission: PERMISSION_NAV.flows,
       },
       {

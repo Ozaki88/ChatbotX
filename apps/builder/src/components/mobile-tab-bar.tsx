@@ -5,7 +5,7 @@ import { cn } from "@chatbotx.io/ui/lib/utils"
 import {
   AtomIcon,
   BarChart3Icon,
-  InstagramIcon,
+  CameraIcon,
   MenuIcon,
   MessageCircleMoreIcon,
 } from "lucide-react"
@@ -24,7 +24,7 @@ export function MobileTabBar({ workspaceId }: { workspaceId: string }) {
   const tabs = [
     { label: "Stats", href: `${base}/dashboard/freya-stats`, icon: BarChart3Icon },
     { label: "Inbox", href: `${base}/inbox`, icon: MessageCircleMoreIcon },
-    { label: "Comments", href: `${base}/ig-comments`, icon: InstagramIcon },
+    { label: "Comments", href: `${base}/ig-comments`, icon: CameraIcon },
     { label: "Keywords", href: `${base}/automated-responses`, icon: AtomIcon },
   ]
   const itemClass =
