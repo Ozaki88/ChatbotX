@@ -68,8 +68,7 @@ export const describeSharedPosts = (
   }
   return links
     .map((url) => `📎 Shared a post: ${url}`)
-    .join("
-")
+    .join("\n")
 }
 
 const getMessageAttachments = async (
@@ -165,8 +164,7 @@ const getMessageEntity = async (
       text:
         [messaging.message.text, describeSharedPosts(messaging.message)]
           .filter(Boolean)
-          .join("
-") || messaging.message.text,
+          .join("\n") || messaging.message.text,
       contentType: contentTypes.enum.text,
       contentAttributes,
       attachments: await getMessageAttachments(ctx, messaging.message),
