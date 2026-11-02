@@ -176,7 +176,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       SELECT COUNT(*) AS "count"
       FROM "ContactToTag" ct
       JOIN "Tag" t ON t."id" = ct."tagId"
-      WHERE t."workspaceId" = ${filter.workspaceId} AND t."name" = 'tapped-gummies'`,
+      WHERE t."workspaceId" = ${filter.workspaceId} AND t."name" IN ('tapped-gummies', 'tapped-book')`,
     ),
     run(
       "new contacts",

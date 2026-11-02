@@ -382,7 +382,7 @@ function Hero({
         <Arrow />
         <Big n={t.tapped} /> taps
         <Arrow />
-        <Big accent n={t.linkClicks} /> Amazon clicks
+        <Big accent n={t.linkClicks} /> link clicks
       </p>
 
       <div
@@ -462,7 +462,7 @@ function Kpis({ stats }: { stats: FreyaStats }) {
       sub: `${pct(t.tapped, t.dmDelivered)} of delivered`,
     },
     {
-      label: "Amazon clicks",
+      label: "Link clicks",
       value: t.linkClicks,
       sub: `${t.linkPeople} people`,
       accent: HONEY,
@@ -507,8 +507,8 @@ function Funnel({ stats }: { stats: FreyaStats }) {
   const top = Math.max(1, ...steps.map((s) => s.value))
   return (
     <Section
-      hint="Seen stays at 0 until the Meta app sends read receipts (message_reads / messaging_seen webhooks)."
-      title="Funnel: comment → Amazon"
+      hint="Taps = people tagged tapped-gummies or tapped-book. Clicks = Magic Link opens (gummies-amazon, guilt-free-book)."
+      title="Funnel: comment → link"
     >
       <div className="flex flex-col gap-2">
         {steps.map((step, index) => (
@@ -807,7 +807,7 @@ function LinksTable({ rows }: { rows: FreyaStats["links"] }) {
   if (rows.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No tracked link clicks yet. Use a Magic Link on the Amazon button to
+        No tracked link clicks yet. Use a Magic Link on the offer button to
         count them.
       </p>
     )
