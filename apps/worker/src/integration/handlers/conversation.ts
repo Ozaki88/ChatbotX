@@ -22,10 +22,14 @@ export const contactMarkAsRead = async (
     )
   const { inbox } = dbIntegration
 
+  // The inbox's own channel, not the webhook's label: the Instagram-via-
+  // Facebook webhook queues read receipts as "instagram" while the inbox is
+  // "instagramFacebook" (incoming messages already resolve the same way), so
+  // matching on the label found nothing and every Instagram "seen" was dropped.
   const contactInbox = await contactInboxService.findByUncached({
     where: {
       sourceId: sourceConversationId,
-      channel: integrationType,
+      channel: inbox.channel,
       inboxId: inbox.id,
     },
   })
@@ -71,7 +75,7 @@ export const contactMarkAsRead = async (
       contactId: contactInbox.contactId,
       conversationId: conversation.id,
       contactInboxId: contactInbox.id,
-      channel: integrationType,
+      channel: inbox.channel,
     },
     action: {},
     occurredAt: seenAt,
