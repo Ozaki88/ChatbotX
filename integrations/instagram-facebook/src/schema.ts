@@ -136,8 +136,12 @@ export const instagramMessageSchema = z.object({
 })
 export type InstagramMessage = z.infer<typeof instagramMessageSchema>
 
+// Instagram read receipts name the last message read (`mid`); only Messenger
+// sends a `watermark`. Requiring the watermark made every Instagram receipt
+// fail validation, and the whole webhook was skipped, so "Seen" never moved.
 export const instagramReadSchema = z.object({
-  watermark: z.number(),
+  mid: z.string().optional(),
+  watermark: z.number().optional(),
 })
 
 export const instagramPostbackSchema = z.object({
