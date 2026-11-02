@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto"
 import { automatedResponseService } from "@chatbotx.io/automated-response"
 import { broadcastService, contactActivityService } from "@chatbotx.io/business"
-import { and, db, eq } from "@chatbotx.io/database/client"
+import { and, db, desc, eq } from "@chatbotx.io/database/client"
 import { createMessageRepository } from "@chatbotx.io/database/repositories"
-import { contactsOnBroadcastsModel } from "@chatbotx.io/database/schema"
+import {
+  contactsOnBroadcastsModel,
+  flowVersionModel,
+} from "@chatbotx.io/database/schema"
 import type {
   ContactInboxModel,
   ConversationModel,
@@ -1088,11 +1091,57 @@ async function runFlowAction(
     throw error
   }
 
-  const nodes = flowVersion.nodes as unknown as FlowNode[]
+  let nodes = flowVersion.nodes as unknown as FlowNode[]
 
   // The channel cannot say whether the tap was a step button or a node quick
   // reply, so the flow decides — and drives the target type from here on.
-  const target = resolveFlowActionTarget(nodes, buttonId)
+  let target = resolveFlowActionTarget(nodes, buttonId)
+
+  // Freya fork: a button that was deleted and re-added in the editor gets a
+  // new id, so every DM sent before that republish carries an id the live
+  // version no longer has. Those taps used to be dropped ("matches no button").
+  // The payload pins no version, so look the id up in the flow's earlier
+  // published versions, newest first, and run what that button did.
+  if (!target && !parsedAction.flowVersionId) {
+    const earlier = await db
+      .select()
+      .from(flowVersionModel)
+      .where(
+        and(
+          eq(flowVersionModel.flowId, parsedAction.flowId),
+          eq(flowVersionModel.workspaceId, conversation.workspaceId),
+          eq(flowVersionModel.isDraft, false),
+        ),
+      )
+      .orderBy(desc(flowVersionModel.createdAt))
+      .limit(30)
+    for (const version of earlier) {
+      if (version.id === flowVersion.id) {
+        continue
+      }
+      const candidateNodes = version.nodes as unknown as FlowNode[]
+      const candidate = resolveFlowActionTarget(candidateNodes, buttonId)
+      if (candidate) {
+        logger.info(
+          {
+            ...createFlowActionWarningContext(data),
+            buttonId,
+            flowId: parsedAction.flowId,
+            liveFlowVersionId: flowVersion.id,
+            matchedFlowVersionId: version.id,
+          },
+          `${handler.name}: button found in an earlier published version`,
+        )
+        nodes = candidateNodes
+        target = candidate
+        // Continuations still resolve the live version (useLatestFlowVersion
+        // below); only this tap's own step runs from the version that has it.
+        flowVersion = version as FlowVersionModel
+        break
+      }
+    }
+  }
+
   if (!target) {
     logger.warn(
       {
