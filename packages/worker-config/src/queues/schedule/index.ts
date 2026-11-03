@@ -59,6 +59,7 @@ export const ScheduleJobData = {
   // WhatsApp calling.
   purgeExpiredCallRecordings: "purgeExpiredCallRecordings",
   freyaMorningSummary: "freyaMorningSummary",
+  freyaGiftFollowUp: "freyaGiftFollowUp",
   sweepStaleWhatsappCalls: "sweepStaleWhatsappCalls",
   dispatchProfileSnapshots: "dispatchProfileSnapshots",
 } as const
@@ -373,6 +374,24 @@ export type ScheduleJobFreyaMorningSummary = {
   data: Record<string, never>
 }
 
+/**
+ * Freya fork: one delayed follow-up after a YES gift is picked. `stage` says
+ * which one; the handler decides at send time whether it still applies.
+ */
+export type ScheduleJobFreyaGiftFollowUp = {
+  type: typeof ScheduleJobData.freyaGiftFollowUp
+  data: {
+    stage: "3h" | "20h"
+    workspaceId: string
+    contactId: string
+    contactInboxId: string
+    conversationId: string
+    flowId: string
+    buttonId: string
+    tappedAt: string
+  }
+}
+
 /** Every 5 minutes: `ringing` call rows older than 90s that were never finalized -> `failed`. */
 export type ScheduleJobSweepStaleWhatsappCalls = {
   type: typeof ScheduleJobData.sweepStaleWhatsappCalls
@@ -444,6 +463,7 @@ export type ScheduleJobData =
   | ScheduleJobTeardownExpiredTrial
   | ScheduleJobPurgeExpiredCallRecordings
   | ScheduleJobFreyaMorningSummary
+  | ScheduleJobFreyaGiftFollowUp
   | ScheduleJobSweepStaleWhatsappCalls
 
 export const scheduleQueue = isNoRedisEnv()

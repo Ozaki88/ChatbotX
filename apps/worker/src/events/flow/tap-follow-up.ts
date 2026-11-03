@@ -9,6 +9,7 @@ import type { FlowClickedPayload } from "@chatbotx.io/flow-config"
 import { applySpintax } from "@chatbotx.io/utils/spintax"
 import { ChatJobAction, chatQueue } from "@chatbotx.io/worker-config"
 import { logger } from "../../lib/logger"
+import { scheduleGiftFollowUps } from "./gift-follow-up"
 
 /**
  * Freya fork: one nudge after a comment-DM button is tapped.
@@ -48,6 +49,7 @@ export async function scheduleTapFollowUps(
         contactInboxId: payload.context.contactInboxId,
         occurredAt: payload.occurredAt,
       })
+      await scheduleGiftFollowUps(payload)
     } catch (err) {
       logger.warn(
         { err, contactInboxId: payload.context.contactInboxId },
