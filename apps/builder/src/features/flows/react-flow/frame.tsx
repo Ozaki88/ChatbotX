@@ -7,7 +7,7 @@ import type { FlowVersionResource } from "@/features/flow-versions/schema/resour
 import type { FlowResource } from "../schema/resource"
 import { ButtonEditorDialog } from "./button-editor-dialog"
 import { FlowCanvasStatsProvider } from "./canvas/flow-canvas-stats"
-import type { FlowTrigger } from "./canvas/flow-triggers"
+import type { FlowTriggers } from "./canvas/flow-triggers"
 import { FrameHeader } from "./frame-header"
 import { NodeDetailSheet } from "./nodes/node-detail-sheet"
 import { ReactFlowWrapper } from "./react-flow-wrapper"
@@ -17,7 +17,7 @@ import { useStepStore } from "./stores/step-store-provider"
 type ReactFlowFrameProps = {
   flow: FlowResource
   flowVersion: FlowVersionResource
-  triggers: FlowTrigger[]
+  triggers: FlowTriggers
   canRevertToPublished: boolean
   hasPublishedVersion: boolean
 }

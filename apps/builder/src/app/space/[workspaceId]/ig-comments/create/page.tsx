@@ -1,3 +1,4 @@
+import { zodBigintAsString } from "@chatbotx.io/utils"
 import { notFound, redirect } from "next/navigation"
 import type { SearchParams } from "nuqs/server"
 import { CreateIgCommentForm } from "@/features/ig-comments/components/create-ig-comment-form"
@@ -15,8 +16,14 @@ export default async function CreateIgCommentPage(props: {
     return notFound()
   }
 
-  const { variant: rawVariant, postType } = await props.searchParams
+  const {
+    variant: rawVariant,
+    postType,
+    flowId: rawFlowId,
+  } = await props.searchParams
   const isLive = isLivePostTypeParam(postType)
+  // From the flow editor's trigger card: the private reply starts that flow.
+  const initialFlowId = zodBigintAsString().safeParse(rawFlowId).data ?? null
   const { data: variant } = igCommentVariants.safeParse(rawVariant)
   if (!variant) {
     redirect(`/space/${data.workspaceId}/ig-comments`)
@@ -30,6 +37,7 @@ export default async function CreateIgCommentPage(props: {
       workspaceId={data.workspaceId}
     >
       <CreateIgCommentForm
+        initialFlowId={initialFlowId}
         isLive={isLive}
         variant={variant}
         workspaceId={data.workspaceId}

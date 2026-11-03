@@ -1,3 +1,4 @@
+import { zodBigintAsString } from "@chatbotx.io/utils"
 import { notFound } from "next/navigation"
 import type { SearchParams } from "nuqs/server"
 import { CreateFbCommentForm } from "@/features/fb-comments/components/create-fb-comment-form"
@@ -14,8 +15,10 @@ export default async function CreateFbCommentPage(props: {
     return notFound()
   }
 
-  const { postType } = await props.searchParams
+  const { postType, flowId: rawFlowId } = await props.searchParams
   const isLive = isLivePostTypeParam(postType)
+  // From the flow editor's trigger card: the private reply starts that flow.
+  const initialFlowId = zodBigintAsString().safeParse(rawFlowId).data ?? null
 
   return (
     // A Live automation has no post picker, so its posts are never fetched.
@@ -23,7 +26,11 @@ export default async function CreateFbCommentPage(props: {
       autoInitialize={!isLive}
       workspaceId={data.workspaceId}
     >
-      <CreateFbCommentForm isLive={isLive} workspaceId={data.workspaceId} />
+      <CreateFbCommentForm
+        initialFlowId={initialFlowId}
+        isLive={isLive}
+        workspaceId={data.workspaceId}
+      />
     </FbCommentPostsStoreProvider>
   )
 }

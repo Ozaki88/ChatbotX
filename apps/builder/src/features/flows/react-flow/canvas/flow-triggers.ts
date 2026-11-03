@@ -3,26 +3,36 @@ import "server-only"
 import {
   automatedResponseService,
   commentAutomationService,
+  flowService,
 } from "@chatbotx.io/business"
 
 /**
  * What starts a flow, for the trigger card at the left of the editor canvas:
- * every comment automation whose private reply runs the flow, and every
- * inbound keyword rule that hands off to it. Each carries the href of its
- * editor page.
+ * every comment automation whose private reply runs the flow, every inbound
+ * keyword rule that hands off to it, and every button of another flow that
+ * starts it. Each carries the href of its editor page.
  */
 export type FlowTrigger = {
   id: string
-  kind: "comment" | "keyword"
-  /** `messenger`, `instagram`, `instagramFacebook`, `threads`, `tiktok`, or `inbound`. */
+  kind: "comment" | "keyword" | "button"
+  /** `messenger`, `instagram`, `instagramFacebook`, `threads`, `tiktok`, `inbound`, or `flow`. */
   channel: string
+  /** The rule's name, or for a button trigger the other flow's name. */
   name: string
   isActive: boolean
   /** Match words, in the order the rule stores them. Empty when any comment matches. */
   keywords: string[]
   /** Comment rules only: which posts it watches. */
   postScope: "all" | "live" | "posts" | null
+  /** Button triggers only: the button's label. */
+  buttonLabel: string | null
   href: string
+}
+
+export type FlowTriggers = {
+  items: FlowTrigger[]
+  /** Query string for a new Instagram rule: the connection type in use. */
+  igVariant: string
 }
 
 const COMMENT_RULE_PATHS: Record<string, string> = {
@@ -43,14 +53,16 @@ const postScopeOf = (post: { type: string }): FlowTrigger["postScope"] => {
 export async function listFlowTriggers(input: {
   workspaceId: string
   flowId: string
-}): Promise<FlowTrigger[]> {
-  const [commentRules, keywordRules] = await Promise.all([
+}): Promise<FlowTriggers> {
+  const [commentRules, keywordRules, buttons, igVariant] = await Promise.all([
     commentAutomationService.listByReplyFlow(input),
     automatedResponseService.listByFlow(input),
+    flowService.listButtonsStartingFlow(input),
+    commentAutomationService.findIgVariantInUse(input.workspaceId),
   ])
   const base = `/space/${input.workspaceId}`
 
-  return [
+  const items: FlowTrigger[] = [
     ...commentRules.map(
       (rule): FlowTrigger => ({
         id: rule.id,
@@ -64,6 +76,7 @@ export async function listFlowTriggers(input: {
             ? rule.includeKeywords.value
             : [],
         postScope: postScopeOf(rule.post),
+        buttonLabel: null,
         href: `${base}/${COMMENT_RULE_PATHS[rule.type] ?? "fb-comments"}/${rule.id}`,
       }),
     ),
@@ -76,11 +89,27 @@ export async function listFlowTriggers(input: {
         isActive: rule.status,
         keywords: rule.keywords,
         postScope: null,
+        buttonLabel: null,
         href:
           rule.type === "inbound"
             ? `${base}/automated-responses/${rule.id}/edit`
             : `${base}/page-automated-responses/${rule.id}/edit`,
       }),
     ),
+    ...buttons.map(
+      (button, index): FlowTrigger => ({
+        id: `${button.flowId}:${index}`,
+        kind: "button",
+        channel: "flow",
+        name: button.flowName,
+        isActive: true,
+        keywords: [],
+        postScope: null,
+        buttonLabel: button.buttonLabel,
+        href: `${base}/flows/${button.flowId}`,
+      }),
+    ),
   ]
+
+  return { items, igVariant: igVariant ?? "instagramFacebook" }
 }

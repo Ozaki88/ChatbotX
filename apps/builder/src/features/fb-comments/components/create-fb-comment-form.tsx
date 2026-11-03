@@ -51,9 +51,12 @@ const defaultValues = {
 export function CreateFbCommentForm({
   workspaceId,
   isLive,
+  initialFlowId = null,
 }: {
   workspaceId: string
   isLive: boolean
+  /** Pre-selects "run a flow" as the private reply (from the flow editor). */
+  initialFlowId?: string | null
 }) {
   const t = useTranslations()
   const router = useRouter()
@@ -79,7 +82,13 @@ export function CreateFbCommentForm({
       },
       formProps: {
         mode: "onChange",
-        defaultValues: { ...defaultValues, post: initialCommentPost(isLive) },
+        defaultValues: {
+          ...defaultValues,
+          post: initialCommentPost(isLive),
+          privateReply: initialFlowId
+            ? { type: "flow" as const, value: initialFlowId }
+            : defaultValues.privateReply,
+        },
       },
     },
   )

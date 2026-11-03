@@ -2093,7 +2093,12 @@
       "anyComment": "Any comment",
       "off": "Off",
       "empty": "Nothing starts this flow yet. Add a comment rule or a keyword that runs it.",
-      "addCommentRule": "Add a comment rule"
+      "button": "Tapped a button in {flow}",
+      "buttonLabel": "Button: {label}",
+      "add": "Add a trigger",
+      "addInstagram": "Instagram comment rule",
+      "addFacebook": "Facebook comment rule",
+      "addKeyword": "DM keyword"
     }
   },
   "autoAssignConversation": {

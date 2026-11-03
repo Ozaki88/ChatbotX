@@ -20,10 +20,13 @@ export function CreateIgCommentForm({
   workspaceId,
   variant,
   isLive,
+  initialFlowId = null,
 }: {
   workspaceId: string
   variant: IgCommentVariant
   isLive: boolean
+  /** Pre-selects "run a flow" as the private reply (from the flow editor). */
+  initialFlowId?: string | null
 }) {
   const t = useTranslations()
   const router = useRouter()
@@ -33,7 +36,9 @@ export function CreateIgCommentForm({
     type: variant,
     folderId: undefined,
     post: initialCommentPost(isLive),
-    privateReply: { type: "text" as const, value: "" },
+    privateReply: initialFlowId
+      ? { type: "flow" as const, value: initialFlowId }
+      : { type: "text" as const, value: "" },
     publicReply: {
       type: "none" as const,
       value: null,

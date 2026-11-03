@@ -63,6 +63,47 @@ type ResolveFieldsByNameAndType = (props: {
  * `importFlowExport`'s customField and botField branches, which are
  * otherwise identical apart from which service resolves the manifest.
  */
+export type FlowButtonTrigger = {
+  flowId: string
+  flowName: string
+  buttonLabel: string
+}
+
+type LooseButton = {
+  label?: string
+  buttonType?: string | null
+  beforeStep?: { flowId?: string } | null
+}
+
+/** Buttons wherever a node keeps them: text/card steps, carousel cards, quick replies. */
+function* readNodeButtons(node: unknown): Generator<LooseButton> {
+  const details = (node as { data?: { details?: Record<string, unknown> } })
+    ?.data?.details
+  if (!details) {
+    return
+  }
+  const steps = Array.isArray(details.steps) ? details.steps : []
+  for (const step of steps as {
+    buttons?: LooseButton[]
+    cards?: { buttons?: LooseButton[] }[]
+  }[]) {
+    for (const button of step.buttons ?? []) {
+      yield button
+    }
+    for (const card of step.cards ?? []) {
+      for (const button of card.buttons ?? []) {
+        yield button
+      }
+    }
+  }
+  const quickReplies = Array.isArray(details.quickReplies)
+    ? (details.quickReplies as LooseButton[])
+    : []
+  for (const button of quickReplies) {
+    yield button
+  }
+}
+
 const resolveManifestIdMap = async (
   manifest: Record<string, FieldManifestEntry>,
   resolve: ResolveFieldsByNameAndType,
@@ -232,6 +273,43 @@ class FlowService extends BaseService {
    * a node id (the "Executed Step" filter). A flow that was never published
    * has none.
    */
+  /**
+   * Every button of another flow's current version whose action is Start
+   * External Flow into `flowId`: what the flow editor's trigger card lists
+   * as "tapped a button in …". Reads every flow of the workspace; flows are
+   * few and this runs once per editor page load.
+   */
+  async listButtonsStartingFlow(input: {
+    workspaceId: string
+    flowId: string
+  }): Promise<FlowButtonTrigger[]> {
+    const flows = await db.query.flowModel.findMany({
+      where: { workspaceId: input.workspaceId, id: { ne: input.flowId } },
+      columns: { id: true, name: true },
+      with: { flowVersion: { columns: { nodes: true } } },
+    })
+
+    const triggers: FlowButtonTrigger[] = []
+    for (const flow of flows) {
+      const nodes = (flow.flowVersion?.nodes ?? []) as unknown[]
+      for (const node of nodes) {
+        for (const button of readNodeButtons(node)) {
+          if (
+            button.buttonType === "startExternalFlow" &&
+            button.beforeStep?.flowId === input.flowId
+          ) {
+            triggers.push({
+              flowId: flow.id,
+              flowName: flow.name,
+              buttonLabel: button.label ?? "",
+            })
+          }
+        }
+      }
+    }
+    return triggers
+  }
+
   async listNodes(input: {
     workspaceId: string
     flowId: string

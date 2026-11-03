@@ -1142,6 +1142,25 @@ class CommentAutomationService extends BaseService {
       .orderBy(t.createdAt)
   }
 
+  /**
+   * The Instagram connection type the workspace's newest Instagram comment
+   * rule uses, so a "new Instagram rule" link can skip the connection
+   * chooser; null when the workspace has none yet.
+   */
+  async findIgVariantInUse(
+    workspaceId: string,
+  ): Promise<IgCommentAutomationType | null> {
+    const row = await db.query.commentAutomationModel.findFirst({
+      where: {
+        workspaceId,
+        type: { in: [...igCommentAutomationTypes.options] },
+      },
+      orderBy: { createdAt: "desc" },
+      columns: { type: true },
+    })
+    return (row?.type as IgCommentAutomationType | undefined) ?? null
+  }
+
   async listIgComments(
     input: ListFbCommentsInput,
   ): Promise<ListFbCommentsResult> {

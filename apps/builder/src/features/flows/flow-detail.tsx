@@ -10,7 +10,7 @@ import { EmailTopicStoreProvider } from "../email-topics/provider/email-topic-st
 import type { FlowVersionResource } from "../flow-versions/schema/resource"
 import type { IntegrationOpenaiCompatibleResource } from "../integration-openai-compatible/schema/resource"
 
-import type { FlowTrigger } from "./react-flow/canvas/flow-triggers"
+import type { FlowTriggers } from "./react-flow/canvas/flow-triggers"
 import { ReactFlowFrame } from "./react-flow/frame"
 import { FlowTemplateStoreProvider } from "./react-flow/stores/flow-template-store-provider"
 import { StepStoreProvider } from "./react-flow/stores/step-store-provider"
@@ -20,7 +20,7 @@ import type { FlowWithVersionsResource } from "./schema/resource"
 type FlowDetailProps = {
   flow: FlowWithVersionsResource
   flowVersion: FlowVersionResource
-  triggers: FlowTrigger[]
+  triggers: FlowTriggers
   openaiCompatibleIntegrations: IntegrationOpenaiCompatibleResource[]
   canRevertToPublished: boolean
   hasPublishedVersion: boolean

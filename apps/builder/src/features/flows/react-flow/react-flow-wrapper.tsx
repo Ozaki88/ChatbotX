@@ -39,7 +39,7 @@ import {
   isDerivedEdge,
   withoutDerivedEdges,
 } from "./canvas/derived-button-edges"
-import type { FlowTrigger } from "./canvas/flow-triggers"
+import type { FlowTriggers } from "./canvas/flow-triggers"
 import { StatsRangeSelector } from "./canvas/stats-range-selector"
 import { TriggerCard } from "./canvas/trigger-card"
 import {
@@ -100,7 +100,7 @@ const edgeTypes = {
 
 type ReactFlowFrameProps = {
   flowVersion: FlowVersionResource
-  triggers: FlowTrigger[]
+  triggers: FlowTriggers
   setOpenNodeDetailSheet: (open: boolean) => void
   onAutosaveFlushChange: (flushAutosave: (() => void) | null) => void
   onAutosaveCancelChange: (cancelAutosave: (() => void) | null) => void
@@ -636,6 +636,7 @@ export function ReactFlowWrapper({
         <Background />
         <StatsRangeSelector />
         <TriggerCard
+          flowId={flowVersion.flowId}
           startPosition={startNode?.position ?? null}
           triggers={triggers}
           workspaceId={flowVersion.workspaceId}

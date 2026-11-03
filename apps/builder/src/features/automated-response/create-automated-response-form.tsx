@@ -26,6 +26,8 @@ import { createAutomatedResponseRequest, responseModes } from "./schema/action"
 type CreateAutomatedResponseFormProps = {
   workspaceId: string
   folderId: string | null
+  /** Pre-selects this flow as the response (from the flow editor). */
+  initialFlowId?: string | null
   type: AutomatedResponseType
   basePath: string
 }
@@ -33,7 +35,7 @@ type CreateAutomatedResponseFormProps = {
 export function CreateAutomatedResponseForm(
   props: CreateAutomatedResponseFormProps,
 ) {
-  const { workspaceId, folderId, type, basePath } = props
+  const { workspaceId, folderId, type, basePath, initialFlowId = null } = props
 
   const searchParams = useSearchParams()
 
@@ -74,7 +76,7 @@ export function CreateAutomatedResponseForm(
           folderId: folderId ?? null,
           keywords: [{ value: "" }],
           text: "",
-          flowId: "",
+          flowId: initialFlowId ?? "",
         },
       },
       errorMapProps: {},
