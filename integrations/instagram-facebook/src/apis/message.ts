@@ -14,7 +14,7 @@ export const sendMessage = (
   const { version = DEFAULT_API_VERSION } = auth
   const endpoint = `${version}/me/messages`
 
-  return rescue(endpoint, () =>
+  const send = () =>
     instagramGraphClient.post<InstagramSendMessageResponse>(endpoint, {
       headers: {
         "Content-Type": "application/json",
@@ -22,6 +22,27 @@ export const sendMessage = (
       },
       json: payload,
       retry: 0,
-    }),
+    })
+
+  return rescue(endpoint, async () => {
+    try {
+      return await send()
+    } catch (error) {
+      // A dropped connection (ECONNRESET) never reached a Graph answer, so the
+      // message was lost: try once more instead of failing the person's tap.
+      if (!isNetworkError(error)) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS))
+      return await send()
+    }
+  })
+}
+
+const NETWORK_RETRY_DELAY_MS = 2000
+
+function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof Error && /network error/i.test(error.message)
   )
 }

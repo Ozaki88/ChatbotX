@@ -61,7 +61,8 @@ async function scheduleOne(props: {
   workspaceId: string
   contactId: string
   contactInboxId: string
-  occurredAt: Date
+  // Job payloads arrive JSON-serialized, so this can be an ISO string.
+  occurredAt: Date | string
 }): Promise<void> {
   const contactInbox = await contactInboxService.findByIdForWorkspace({
     id: props.contactInboxId,
@@ -90,7 +91,7 @@ async function scheduleOne(props: {
   })
   queueMessageCreatedEvent(props.workspaceId, message, conversation)
 
-  const day = props.occurredAt.toISOString().slice(0, 10)
+  const day = new Date(props.occurredAt).toISOString().slice(0, 10)
   await chatQueue.add(
     ChatJobAction.sendChannelMessage,
     {
