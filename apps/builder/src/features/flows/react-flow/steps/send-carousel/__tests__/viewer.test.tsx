@@ -20,6 +20,11 @@ vi.mock("@xyflow/react", async (importOriginal) => ({
   useUpdateNodeInternals: () => mocks.updateNodeInternals,
 }))
 
+// The button row reads its CTR label through next-intl even outside analytics.
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}))
+
 vi.mock("@/components/base-handle", () => ({
   BaseHandle: ({ id }: { id?: string | null }) => (
     <span data-handleid={id ?? ""} />

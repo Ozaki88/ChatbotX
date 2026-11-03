@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest"
 
+const DM_TEXT = /DM/
+const ALREADY_TEXT = /already/i
+const SPINTAX_LEFTOVER = /[{}|]/
+
 const mockFindFailedPrivateReplyError = vi.fn()
 
 vi.mock("@chatbotx.io/analytics", () => ({
@@ -29,8 +33,8 @@ describe("resolvePublicReplyFallbackText", () => {
 
     const text = await resolvePublicReplyFallbackText(publicAttributes)
 
-    expect(text).toMatch(/DM/)
-    expect(text).not.toMatch(/[{}|]/)
+    expect(text).toMatch(DM_TEXT)
+    expect(text).not.toMatch(SPINTAX_LEFTOVER)
     expect(mockFindFailedPrivateReplyError).toHaveBeenCalledWith({
       automationId: "a1",
       commentId: "c1",
@@ -44,8 +48,8 @@ describe("resolvePublicReplyFallbackText", () => {
 
     const text = await resolvePublicReplyFallbackText(publicAttributes)
 
-    expect(text).toMatch(/already/i)
-    expect(text).not.toMatch(/[{}|]/)
+    expect(text).toMatch(ALREADY_TEXT)
+    expect(text).not.toMatch(SPINTAX_LEFTOVER)
   })
 
   test("keeps the configured reply when the DM did not fail", async () => {

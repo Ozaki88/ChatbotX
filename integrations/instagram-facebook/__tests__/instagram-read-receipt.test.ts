@@ -9,12 +9,12 @@ describe("Instagram read receipts", () => {
     entry: [
       {
         id: "17841400000000000",
-        time: 1793649613,
+        time: 1_793_649_613,
         messaging: [
           {
             sender: { id: "1234567890" },
             recipient: { id: "17841400000000000" },
-            timestamp: 1793649613000,
+            timestamp: 1_793_649_613_000,
             read: { mid: "aWdfZAG1faXRlbToxOklHTWVzc2FnZUlEOjE" },
           },
         ],
@@ -32,7 +32,11 @@ describe("Instagram read receipts", () => {
 
   it("still accepts the Messenger shape (watermark)", () => {
     const payload = structuredClone(base)
-    payload.entry[0]!.messaging[0]!.read = { watermark: 1793649613000 } as never
+    const messaging = payload.entry[0]?.messaging[0]
+    if (!messaging) {
+      throw new Error("fixture has no messaging entry")
+    }
+    messaging.read = { watermark: 1_793_649_613_000 } as never
     expect(instagramWebhookEventSchema.safeParse(payload).success).toBe(true)
   })
 })

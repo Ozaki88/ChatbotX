@@ -2,6 +2,7 @@
 
 import { type Edge, type Node, useReactFlow } from "@xyflow/react"
 import { useCallback } from "react"
+import { withoutDerivedEdges } from "../canvas/derived-button-edges"
 import {
   useFlowHistoryStore,
   useFlowHistoryStoreApi,
@@ -13,7 +14,13 @@ type TakeSnapshot = {
 }
 
 export const useFlowHistory = () => {
-  const { getEdges, getNodes } = useReactFlow()
+  const { getEdges: getStoreEdges, getNodes } = useReactFlow()
+  // A snapshot restores through setEdges, so a derived arrow captured here
+  // would become a saved edge on undo.
+  const getEdges = useCallback(
+    () => withoutDerivedEdges(getStoreEdges()),
+    [getStoreEdges],
+  )
   const store = useFlowHistoryStoreApi()
   const pastCount = useFlowHistoryStore((state) => state.past.length)
   const futureCount = useFlowHistoryStore((state) => state.future.length)

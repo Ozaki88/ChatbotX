@@ -28,6 +28,11 @@ import { folderService } from "../folder/service"
 import { assertDeletable } from "../template/installed-resource.service"
 import type { PaginatedResult } from "../types"
 
+export type AutomatedResponseFlowTrigger = Pick<
+  AutomatedResponseModel,
+  "id" | "type" | "keywords" | "status"
+>
+
 export type UpdateAutomatedResponseRequest = {
   folderId?: string | null
   keywords?: Array<{ value: string }>
@@ -97,6 +102,30 @@ class AutomatedResponseService extends BaseService {
       columns: { id: true, keywords: true },
     })
     return rows.map((row) => ({ id: row.id, name: row.keywords.join(", ") }))
+  }
+
+  /**
+   * The keyword rules that start `flowId` when a contact sends one of their
+   * keywords: what the flow editor's trigger card lists as "When… user sends
+   * a message". Display-only read.
+   */
+  async listByFlow(input: {
+    workspaceId: string
+    flowId: string
+  }): Promise<AutomatedResponseFlowTrigger[]> {
+    const t = automatedResponseModel
+    return await db
+      .select({
+        id: t.id,
+        type: t.type,
+        keywords: t.keywords,
+        status: t.status,
+      })
+      .from(t)
+      .where(
+        and(eq(t.workspaceId, input.workspaceId), eq(t.flowId, input.flowId)),
+      )
+      .orderBy(t.createdAt)
   }
 
   async findBy(

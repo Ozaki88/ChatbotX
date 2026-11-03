@@ -58,6 +58,7 @@ import {
   type PublishFlowSchema,
   updateFlowVersionSchema,
 } from "../schema/action"
+import { withoutDerivedEdges } from "./canvas/derived-button-edges"
 import AnalyticsFlow from "./components/analytics-flow"
 import { FlowVersionsDialog } from "./components/flow-versions-dialog"
 import { MessengerAdPayloadDialog } from "./components/messenger-ad-payload-dialog"
@@ -173,7 +174,7 @@ export function FlowEditToolbar({
         // baseline and refresh server state so gates that depend on
         // "published & clean" (the Messenger Ads JSON action, the revert
         // button) update immediately instead of staying stale until reload.
-        markSaved?.(getNodes(), getEdges())
+        markSaved?.(getNodes(), withoutDerivedEdges(getEdges()))
         invalidateFlows()
         router.refresh()
       },
@@ -206,7 +207,8 @@ export function FlowEditToolbar({
 
     // validate nodes & edges
     const nodes = getNodes()
-    const edges = getEdges()
+    // Derived button arrows live only in the store; they are not flow data.
+    const edges = withoutDerivedEdges(getEdges())
     const validationResult = updateFlowVersionSchema.safeParse({
       nodes,
       edges,

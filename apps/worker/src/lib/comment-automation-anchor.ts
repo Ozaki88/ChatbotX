@@ -68,9 +68,11 @@ export const DM_FAILED_PUBLIC_REPLY =
 export const DM_ALREADY_SENT_PUBLIC_REPLY =
   "{I already sent it to you, honey 💛 it's in your messages (check requests too)|It's already in your DMs from last time, honey 💛 have a look in your message requests|Already sent it to you, sugar 💛 check your messages or requests}"
 
+const ALREADY_REPLIED_ERROR = /already has a reply|already replied/i
+
 export const publicReplyForDmError = (errorDetail: string): string =>
   applySpintax(
-    /already has a reply|already replied/i.test(errorDetail)
+    ALREADY_REPLIED_ERROR.test(errorDetail)
       ? DM_ALREADY_SENT_PUBLIC_REPLY
       : DM_FAILED_PUBLIC_REPLY,
   )
@@ -84,7 +86,7 @@ export async function resolvePublicReplyFallbackText(
   contentAttributes: MessageLikeContentAttributes | undefined,
 ): Promise<string | null> {
   const anchor = readCommentAutomationAnchor(contentAttributes)
-  if (!anchor || anchor.replyChannel !== "public") {
+  if (anchor?.replyChannel !== "public") {
     return null
   }
 

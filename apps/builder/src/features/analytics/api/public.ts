@@ -54,6 +54,7 @@ import {
   flowSmartDelayStatsPublicResponse,
   flowStatsPublicRequest,
   flowStatsPublicResponse,
+  flowStatsRangePublicRequest,
   humanAgentStatsPublicResponse,
   type linkContactPublicResource,
   linkContactsPublicRequest,
@@ -75,8 +76,11 @@ import { commentAutomationAnalyticsPublicRouter } from "./public-comment-automat
 const workspaceTokenAuthAPI = workspaceTokenAuthAPIForScope("analytics")
 
 const flowStatsCacheTag = (flowId: string) => `flow-stats:${flowId}`
-const flowStatsCacheKey = (workspaceId: string, flowId: string) =>
-  `flow:stats:${workspaceId}:${flowId}`
+const flowStatsCacheKey = (
+  workspaceId: string,
+  flowId: string,
+  since?: string,
+) => `flow:stats:${workspaceId}:${flowId}${since ? `:${since}` : ""}`
 
 const toLinkContact = (
   row: Awaited<
@@ -668,21 +672,22 @@ export const analyticsPublicRouter = {
       path: "/v1/analytics/flows/{flowId}/stats",
       summary: "Get flow analytics",
       description:
-        "Returns per-node statistics for a flow, keyed by send-message node id: `message:sent`, `message:delivered`, `message:seen`, `message:failed`, `flow:clicked` (`clicked`, and `totalUsers`, which is the delivered count) and per-button clicks, for the current analytics session (`analytics.resetFlowStats` starts a new one). Resolve the flow with `flows.get` first. Call `analytics.newContactCountsPerDay` instead for workspace contact trends.",
+        "Returns per-node statistics for a flow, keyed by send-message node id: `message:sent`, `message:delivered`, `message:seen`, `message:failed`, `flow:clicked` (`clicked`, and `totalUsers`, which is the delivered count) and per-button clicks, for the current analytics session (`analytics.resetFlowStats` starts a new one), optionally only events since `since`. Resolve the flow with `flows.get` first. Call `analytics.newContactCountsPerDay` instead for workspace contact trends.",
       tags: ["Analytics"],
       spec: mcpSpec({ visibility: "default" }),
     })
-    .input(flowStatsPublicRequest)
+    .input(flowStatsRangePublicRequest)
     .output(flowStatsPublicResponse)
     .errors(possibleErrorsOnFindingResource)
     .handler(({ context, input }) => {
       const workspaceId = context.workspace.id
       return withCache(
-        flowStatsCacheKey(workspaceId, input.flowId),
+        flowStatsCacheKey(workspaceId, input.flowId, input.since),
         async () =>
           await flowAnalyticsService.getFlowStats({
             workspaceId,
             flowId: input.flowId,
+            since: input.since,
           }),
         { ttl: 120, tags: [flowStatsCacheTag(input.flowId)] },
       )

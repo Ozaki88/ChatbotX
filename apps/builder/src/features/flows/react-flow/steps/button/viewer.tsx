@@ -1,5 +1,4 @@
 import { type ButtonStepProps, buttonTypes } from "@chatbotx.io/flow-config"
-import { Button } from "@chatbotx.io/ui/components/ui/button"
 import { cn } from "@chatbotx.io/ui/lib/utils"
 import { Position } from "@xyflow/react"
 import { useTranslations } from "next-intl"
@@ -10,37 +9,45 @@ type ButtonStepViewerProps = {
   data: ButtonStepProps
 }
 
+/** "CTR 12%": taps of this button over the node's delivered messages. */
+const formatCtr = (clicks: number, delivered: number): string =>
+  delivered > 0 ? `${Math.round((clicks / delivered) * 100)}%` : "—"
+
 export const ButtonStepViewer = (props: ButtonStepViewerProps) => {
   const { data } = props
-  const { isAnalytics, buttonStats, totalSent } = useFlowAnalyticsStore()
+  const t = useTranslations()
+  const { isAnalytics, buttonStats, delivered } = useFlowAnalyticsStore()
   const clicks = buttonStats[data.id] ?? 0
-  const clickPercent =
-    totalSent > 0 ? Math.round((clicks / totalSent) * 100) : 0
+  const hasRouteHandle =
+    data.buttonType === buttonTypes.enum.sendMessage ||
+    data.buttonType === buttonTypes.enum.performAction ||
+    data.buttonType === buttonTypes.enum.startAnotherNode ||
+    data.buttonType === buttonTypes.enum.openMiniApp ||
+    data.buttonType === null
 
   return (
     <div className="relative flex items-center gap-2">
-      <div className="relative min-w-0 flex-1">
+      <div
+        className={cn(
+          "relative flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-background px-3 py-1.5 text-sm",
+          hasRouteHandle && "pe-6",
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {data.label}
+        </span>
         {isAnalytics && (
-          <span className="absolute start-2 top-1/2 -translate-y-1/2 font-medium text-muted-foreground text-xs dark:text-white">
-            {clickPercent}%
+          <span
+            className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground tabular-nums"
+            title={t("flowCanvas.stats.ctrTitle", { clicks, delivered })}
+          >
+            {t("flowCanvas.stats.ctr", { ctr: formatCtr(clicks, delivered) })}
           </span>
         )}
-        <Button
-          className="w-full bg-zinc-300 dark:text-zinc-900"
-          disabled
-          type="button"
-          variant="secondary"
-        >
-          {data.label}
-        </Button>
         {/* React Flow routes from physical Position.Right, so this offset must stay physical. */}
-        {(data.buttonType === buttonTypes.enum.sendMessage ||
-          data.buttonType === buttonTypes.enum.performAction ||
-          data.buttonType === buttonTypes.enum.startAnotherNode ||
-          data.buttonType === buttonTypes.enum.openMiniApp ||
-          data.buttonType === null) && (
+        {hasRouteHandle && (
           <BaseHandle
-            className={cn("right-3!", !!data.buttonType && "bg-red-300")}
+            className={cn("right-2!", !!data.buttonType && "bg-red-300")}
             id={data.id}
             position={Position.Right}
             type="source"
@@ -59,7 +66,7 @@ export const ButtonGroupViewer = (props: ButtonGroupViewerProps) => {
   const { data } = props
 
   return (
-    <div className="flex flex-1 flex-col gap-2 bg-gray-100 px-3 py-2 dark:bg-neutral-700">
+    <div className="flex flex-1 flex-col gap-1.5 bg-muted/40 px-2 py-2">
       {data.map((button) => (
         <ButtonStepViewer data={button} key={button.id} />
       ))}

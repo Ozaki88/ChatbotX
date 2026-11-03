@@ -10,6 +10,7 @@ import {
   conversationHandoffStatsSchema,
   flowNodeContactData,
   flowNodeStatsResponse,
+  flowStatsRangeRequest,
   flowStatsRequest,
   getBotMessagesAIProvidersResponseSchema,
   getBroadcastStatsRequest,
@@ -162,6 +163,10 @@ export const sequenceStepStatsPublicResponse = getSequenceStepStatsResponse
 // ─────────────────────────────────────────────────────────────────────────
 
 export const flowStatsPublicRequest = flowStatsRequest.omit({
+  workspaceId: true,
+})
+/** `flowStats` only: the reset route keeps the body-less `flowStatsPublicRequest`. */
+export const flowStatsRangePublicRequest = flowStatsRangeRequest.omit({
   workspaceId: true,
 })
 // `flowNodeStatsResponse` (a record keyed by node id) has no workspaceId

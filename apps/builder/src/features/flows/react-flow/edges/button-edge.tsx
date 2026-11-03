@@ -42,6 +42,9 @@ export default memo((props: EdgeProps) => {
   } = props
 
   const [edgePath, centerX, centerY] = getBezierPath(props)
+  // A derived edge mirrors a button's Start Another Node action; it is not
+  // saved, so there is nothing to delete.
+  const isDerived = Boolean(props.data?.derived)
 
   return (
     <>
@@ -50,7 +53,7 @@ export default memo((props: EdgeProps) => {
       <EdgeLabelRenderer>
         <EdgeToolbar
           edgeId={props.id}
-          isVisible={!!props.data?.isHovered}
+          isVisible={!isDerived && !!props.data?.isHovered}
           x={centerX}
           y={centerY}
         >

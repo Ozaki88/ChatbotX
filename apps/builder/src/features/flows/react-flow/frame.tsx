@@ -6,6 +6,8 @@ import { useCallback, useState } from "react"
 import type { FlowVersionResource } from "@/features/flow-versions/schema/resource"
 import type { FlowResource } from "../schema/resource"
 import { ButtonEditorDialog } from "./button-editor-dialog"
+import { FlowCanvasStatsProvider } from "./canvas/flow-canvas-stats"
+import type { FlowTrigger } from "./canvas/flow-triggers"
 import { FrameHeader } from "./frame-header"
 import { NodeDetailSheet } from "./nodes/node-detail-sheet"
 import { ReactFlowWrapper } from "./react-flow-wrapper"
@@ -15,6 +17,7 @@ import { useStepStore } from "./stores/step-store-provider"
 type ReactFlowFrameProps = {
   flow: FlowResource
   flowVersion: FlowVersionResource
+  triggers: FlowTrigger[]
   canRevertToPublished: boolean
   hasPublishedVersion: boolean
 }
@@ -22,6 +25,7 @@ type ReactFlowFrameProps = {
 export function ReactFlowFrame({
   flow,
   flowVersion,
+  triggers,
   canRevertToPublished,
   hasPublishedVersion,
 }: ReactFlowFrameProps) {
@@ -86,14 +90,17 @@ export function ReactFlowFrame({
         markSaved={markSaved}
       />
 
-      <ReactFlowWrapper
-        flowVersion={flowVersion}
-        onAutosaveCancelChange={handleAutosaveCancelChange}
-        onAutosaveFlushChange={handleAutosaveFlushChange}
-        onDraftDirtiedChange={handleDraftDirtiedChange}
-        onMarkSavedChange={handleMarkSavedChange}
-        setOpenNodeDetailSheet={setOpenNodeDetailSheet}
-      />
+      <FlowCanvasStatsProvider flowId={flow.id} workspaceId={flow.workspaceId}>
+        <ReactFlowWrapper
+          flowVersion={flowVersion}
+          onAutosaveCancelChange={handleAutosaveCancelChange}
+          onAutosaveFlushChange={handleAutosaveFlushChange}
+          onDraftDirtiedChange={handleDraftDirtiedChange}
+          onMarkSavedChange={handleMarkSavedChange}
+          setOpenNodeDetailSheet={setOpenNodeDetailSheet}
+          triggers={triggers}
+        />
+      </FlowCanvasStatsProvider>
 
       <NodeDetailSheet
         onOpenChange={handleNodeDetailSheetOpenChange}

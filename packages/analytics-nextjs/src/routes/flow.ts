@@ -1,6 +1,7 @@
 import { flowAnalyticsService } from "@chatbotx.io/analytics"
 import {
   flowNodeStatsResponse,
+  flowStatsRangeRequest,
   flowStatsRequest,
 } from "@chatbotx.io/analytics/schemas"
 import { invalidateCacheByTags, withCache } from "@chatbotx.io/redis"
@@ -8,8 +9,11 @@ import { os } from "@orpc/server"
 import { logger } from "../lib/log"
 
 const flowStatsCacheTag = (flowId: string) => `flow-stats:${flowId}`
-const flowStatsCacheKey = (workspaceId: string, flowId: string) =>
-  `flow:stats:${workspaceId}:${flowId}`
+const flowStatsCacheKey = (
+  workspaceId: string,
+  flowId: string,
+  since?: string,
+) => `flow:stats:${workspaceId}:${flowId}${since ? `:${since}` : ""}`
 
 export const analyticsFlowRoutes = os.router({
   resetFlowAnalytics: os
@@ -39,16 +43,17 @@ export const analyticsFlowRoutes = os.router({
       summary: "Get analytics sessions",
       tags: ["Analytics", "Flows"],
     })
-    .input(flowStatsRequest)
+    .input(flowStatsRangeRequest)
     .output(flowNodeStatsResponse)
     .handler(async ({ input }) =>
       withCache(
-        flowStatsCacheKey(input.workspaceId, input.flowId),
+        flowStatsCacheKey(input.workspaceId, input.flowId, input.since),
         async () => {
           try {
             return await flowAnalyticsService.getFlowStats({
               workspaceId: input.workspaceId,
               flowId: input.flowId,
+              since: input.since,
             })
           } catch (error) {
             logger.error({ err: error }, "[analytics:getFlowAnalytics] failed")

@@ -1,6 +1,7 @@
 import {
   flowAnalyticsService,
   flowNodeStatsResponse,
+  flowStatsRangeRequest,
   flowStatsRequest,
 } from "@chatbotx.io/analytics"
 import {
@@ -44,7 +45,7 @@ export const privateFlowsAPI = {
       summary: "Get flow stats",
       tags: ["Flows"],
     })
-    .input(flowStatsRequest)
+    .input(flowStatsRangeRequest)
     .output(flowNodeStatsResponse)
     .use(workspaceAuthorizedMidddleware, (input) => input.workspaceId)
     .handler(
@@ -52,6 +53,7 @@ export const privateFlowsAPI = {
         await flowAnalyticsService.getFlowStats({
           workspaceId: input.workspaceId,
           flowId: input.flowId,
+          since: input.since,
         }),
     ),
 

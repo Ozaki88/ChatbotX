@@ -17,6 +17,7 @@ import type {
   FlowNodeStatFailedItem,
   FlowNodeStatItem,
   FlowNodeStatsResponse,
+  FlowStatsRangeRequest,
   FlowStatsRequest,
   ListFlowNodeContactsResponse,
 } from "../schemas/flow-stats"
@@ -203,7 +204,7 @@ export class FlowAnalyticsService {
     return flowStatsRepository.resetStatsSession(input)
   }
 
-  getFlowStats(input: FlowStatsRequest): Promise<FlowNodeStatsResponse> {
+  getFlowStats(input: FlowStatsRangeRequest): Promise<FlowNodeStatsResponse> {
     return flowStatsRepository.getFlowStats(input)
   }
 

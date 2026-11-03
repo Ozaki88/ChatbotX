@@ -2,6 +2,7 @@ import { flowService } from "@chatbotx.io/business"
 import { notFound } from "next/navigation"
 import { FlowDetail } from "@/features/flows/flow-detail"
 import { isSameContent } from "@/features/flows/flow-version-content"
+import { listFlowTriggers } from "@/features/flows/react-flow/canvas/flow-triggers"
 import { listIntegrationOpenaiCompatible } from "@/features/integration-openai-compatible/queries"
 import { withWorkspaceIdAndIdSchema } from "@/features/workspaces/schema/resource"
 import { requireWorkspacePermission } from "@/lib/auth/require-workspace-permission"
@@ -37,9 +38,10 @@ export default async function FlowPage({ params }: FlowPageProps) {
     return notFound()
   }
 
-  const openaiCompatibleIntegrations = await listIntegrationOpenaiCompatible({
-    workspaceId: data.workspaceId,
-  })
+  const [openaiCompatibleIntegrations, triggers] = await Promise.all([
+    listIntegrationOpenaiCompatible({ workspaceId: data.workspaceId }),
+    listFlowTriggers({ workspaceId: data.workspaceId, flowId: data.id }),
+  ])
   const publishedVersion = flow.flowVersions?.find(
     (v) => v.isLatest && !v.isDraft,
   )
@@ -61,6 +63,7 @@ export default async function FlowPage({ params }: FlowPageProps) {
         flowVersion={draftFlowVersion}
         hasPublishedVersion={hasPublishedVersion}
         openaiCompatibleIntegrations={openaiCompatibleIntegrations}
+        triggers={triggers}
       />
     </div>
   )

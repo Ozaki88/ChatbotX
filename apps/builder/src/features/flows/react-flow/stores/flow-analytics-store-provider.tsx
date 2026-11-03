@@ -5,26 +5,27 @@ import { createContext, useContext } from "react"
 type FlowAnalyticsContextValue = {
   isAnalytics: boolean
   buttonStats: Record<string, number> // buttonId -> clicks
-  totalSent: number
+  /** Messages delivered by the node: the CTR denominator. */
+  delivered: number
 }
 
 const FlowAnalyticsContext = createContext<FlowAnalyticsContextValue>({
   isAnalytics: false,
   buttonStats: {},
-  totalSent: 0,
+  delivered: 0,
 })
 
 export const FlowAnalyticsStoreProvider = ({
   children,
   buttonStats,
-  totalSent,
+  delivered,
 }: {
   children: React.ReactNode
   buttonStats: Record<string, number>
-  totalSent: number
+  delivered: number
 }) => (
   <FlowAnalyticsContext.Provider
-    value={{ isAnalytics: true, buttonStats, totalSent }}
+    value={{ isAnalytics: true, buttonStats, delivered }}
   >
     {children}
   </FlowAnalyticsContext.Provider>

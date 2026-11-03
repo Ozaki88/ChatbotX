@@ -27,7 +27,9 @@ type PreviewMessage = { text: string; buttons: string[] }
 
 function previewFromNode(node: FlowNode | undefined): PreviewMessage[] {
   const steps = (
-    node?.data as { details?: { steps?: Record<string, unknown>[] } } | undefined
+    node?.data as
+      | { details?: { steps?: Record<string, unknown>[] } }
+      | undefined
   )?.details?.steps
   if (!Array.isArray(steps)) {
     return []
@@ -145,10 +147,12 @@ export function CommentRulePreview({
               Pick a DM reply to preview it here.
             </p>
           ) : (
-            dm.map((message, index) => (
-              <div className="flex justify-end" key={`${index}-${message.text}`}>
+            dm.map((message) => (
+              <div className="flex justify-end" key={message.text}>
                 <div className="max-w-[85%] overflow-hidden rounded-2xl bg-violet-600">
-                  <p className="whitespace-pre-wrap px-3 py-2">{message.text}</p>
+                  <p className="whitespace-pre-wrap px-3 py-2">
+                    {message.text}
+                  </p>
                   {message.buttons.map((label) => (
                     <div
                       className="border-violet-500 border-t bg-violet-700 py-2 text-center font-medium"

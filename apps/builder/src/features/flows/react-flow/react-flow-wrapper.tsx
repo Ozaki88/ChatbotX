@@ -35,6 +35,14 @@ import { toast } from "sonner"
 import { updateDraftFlowVersionAction } from "../actions/update-draft-flow-version-action"
 import type { UpdateDraftFlowVersionSchema } from "../schema/action"
 import {
+  deriveButtonEdges,
+  isDerivedEdge,
+  withoutDerivedEdges,
+} from "./canvas/derived-button-edges"
+import type { FlowTrigger } from "./canvas/flow-triggers"
+import { StatsRangeSelector } from "./canvas/stats-range-selector"
+import { TriggerCard } from "./canvas/trigger-card"
+import {
   createDeleteNode,
   type DeleteSaveResult,
 } from "./delete-node-orchestrator"
@@ -92,6 +100,7 @@ const edgeTypes = {
 
 type ReactFlowFrameProps = {
   flowVersion: FlowVersionResource
+  triggers: FlowTrigger[]
   setOpenNodeDetailSheet: (open: boolean) => void
   onAutosaveFlushChange: (flushAutosave: (() => void) | null) => void
   onAutosaveCancelChange: (cancelAutosave: (() => void) | null) => void
@@ -103,6 +112,7 @@ type ReactFlowFrameProps = {
 
 export function ReactFlowWrapper({
   flowVersion,
+  triggers,
   onAutosaveFlushChange,
   onAutosaveCancelChange,
   onDraftDirtiedChange,
@@ -116,10 +126,16 @@ export function ReactFlowWrapper({
     getIntersectingNodes,
     updateNodeData,
     updateEdge,
-    getEdges,
+    getEdges: getStoreEdges,
     deleteElements,
     screenToFlowPosition,
   } = reactFlow
+  // The store also holds the derived button arrows; the orchestrators save
+  // what they read, so they must only ever see the saved edges.
+  const getEdges = useCallback(
+    () => withoutDerivedEdges(getStoreEdges()),
+    [getStoreEdges],
+  )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
     flowVersion.nodes as unknown as FlowNode[],
@@ -332,6 +348,17 @@ export function ReactFlowWrapper({
     handleChanges(nodes, edges)
   }, [handleChanges, nodes, edges, onDraftDirtiedChange])
 
+  // Read-only arrows for button actions without a saved edge, and the trigger
+  // card's anchor. Neither reaches `edges`/`nodes`, so autosave never sees them.
+  const renderedEdges = useMemo(
+    () => [...edges, ...deriveButtonEdges(nodes, edges)],
+    [nodes, edges],
+  )
+  const startNode = useMemo(
+    () => nodes.find((node) => node.data?.isStartNode) ?? nodes[0] ?? null,
+    [nodes],
+  )
+
   const markSaved = useCallback(
     (savedNodes: Node[], savedEdges: Edge[]) => {
       lastSavedSerializedRef.current = serializeFlowContent(
@@ -530,6 +557,9 @@ export function ReactFlowWrapper({
 
   const onEdgeMouseEnter = useCallback(
     (_event: ReactMouseEvent, edge: Edge) => {
+      if (isDerivedEdge(edge)) {
+        return
+      }
       const edgeId = edge.id
 
       // Updates edge
@@ -542,6 +572,9 @@ export function ReactFlowWrapper({
 
   const onEdgeMouseLeave = useCallback(
     (_event: ReactMouseEvent, edge: Edge) => {
+      if (isDerivedEdge(edge)) {
+        return
+      }
       const edgeId = edge.id
       updateEdge(edgeId, (oldEdge) => ({
         data: { ...oldEdge.data, isHovered: false },
@@ -570,7 +603,7 @@ export function ReactFlowWrapper({
           },
         }}
         deleteKeyCode={isFlowMutating ? null : undefined}
-        edges={edges}
+        edges={renderedEdges}
         edgeTypes={edgeTypes}
         elementsSelectable={!isFlowMutating}
         maxZoom={10}
@@ -601,6 +634,12 @@ export function ReactFlowWrapper({
           />
         )}
         <Background />
+        <StatsRangeSelector />
+        <TriggerCard
+          startPosition={startNode?.position ?? null}
+          triggers={triggers}
+          workspaceId={flowVersion.workspaceId}
+        />
         <Panel className="w-[254px]" position="bottom-center">
           <Controls
             className="overflow-hidden rounded-md shadow-none!"

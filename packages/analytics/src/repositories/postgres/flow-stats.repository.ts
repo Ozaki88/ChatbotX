@@ -1,4 +1,12 @@
-import { and, count, db, eq, inArray, sql } from "@chatbotx.io/database/client"
+import {
+  and,
+  count,
+  db,
+  eq,
+  gte,
+  inArray,
+  sql,
+} from "@chatbotx.io/database/client"
 import {
   conversationModel,
   flowAnalyticsSessionModel,
@@ -16,10 +24,17 @@ import type {
   FlowNodeEventType,
   FlowNodeStatItem,
   FlowNodeStatsResponse,
-  FlowStatsRequest,
+  FlowStatsRangeRequest,
   RemoveFlowStatsRequest,
 } from "../../schemas/flow-stats"
 import { BaseRepository } from "./base.repository"
+
+/**
+ * `occurredAt >= since` for the canvas date range, or nothing for the whole
+ * analytics session. `and()` drops the `undefined`.
+ */
+const sinceCondition = (since: Date | undefined) =>
+  since ? gte(flowNodeStatModel.occurredAt, since) : undefined
 
 export class FlowStatsRepository extends BaseRepository {
   async findAnalyticsSessionsByFlowIds(
@@ -56,12 +71,13 @@ export class FlowStatsRepository extends BaseRepository {
     workspaceId: string
     analyticsId: string
     nodeIds: string[]
+    since?: Date
   }): Promise<{
     deliveredByNode: Map<string, number>
     failedByNode: Map<string, number>
     clickedByNode: Map<string, number>
   }> {
-    const { workspaceId, analyticsId, nodeIds } = input
+    const { workspaceId, analyticsId, nodeIds, since } = input
     const t = flowNodeStatModel
 
     const rows = await db
@@ -73,6 +89,7 @@ export class FlowStatsRepository extends BaseRepository {
           eq(t.analyticsId, analyticsId),
           inArray(t.nodeId, nodeIds),
           sql`${t.eventType} IN ('message:delivered', 'message:failed', 'flow:clicked')`,
+          sinceCondition(since),
         ),
       )
       .groupBy(t.nodeId, t.eventType)
@@ -109,8 +126,9 @@ export class FlowStatsRepository extends BaseRepository {
     workspaceId: string
     analyticsId: string
     nodeIds: string[]
+    since?: Date
   }): Promise<Map<string, number>> {
-    const { workspaceId, analyticsId, nodeIds } = input
+    const { workspaceId, analyticsId, nodeIds, since } = input
     const t = flowNodeStatModel
 
     const rows = await db
@@ -127,6 +145,7 @@ export class FlowStatsRepository extends BaseRepository {
           inArray(t.nodeId, nodeIds),
           eq(t.eventType, messageEventTypeSchema.enum["message:delivered"]),
           sql`${conversationModel.contactLastReadAt} >= ${t.occurredAt}`,
+          sinceCondition(since),
         ),
       )
       .groupBy(t.nodeId)
@@ -145,7 +164,9 @@ export class FlowStatsRepository extends BaseRepository {
     await db.insert(flowNodeStatModel).values(data).onConflictDoNothing()
   }
 
-  async getFlowStats(input: FlowStatsRequest): Promise<FlowNodeStatsResponse> {
+  async getFlowStats(
+    input: FlowStatsRangeRequest,
+  ): Promise<FlowNodeStatsResponse> {
     const analyticsSession = await db.query.flowAnalyticsSessionModel.findFirst(
       {
         where: {
@@ -190,6 +211,7 @@ export class FlowStatsRepository extends BaseRepository {
     }
 
     const analyticsId = analyticsSession.id
+    const since = input.since ? new Date(input.since) : undefined
 
     const nodeIds: string[] = []
     const stepButtonMap = new Map<string, string[]>()
@@ -218,11 +240,13 @@ export class FlowStatsRepository extends BaseRepository {
           workspaceId: input.workspaceId,
           analyticsId,
           nodeIds,
+          since,
         }),
         this.getNodeSeenCounts({
           workspaceId: input.workspaceId,
           analyticsId,
           nodeIds,
+          since,
         }),
       ])
 
@@ -271,6 +295,7 @@ export class FlowStatsRepository extends BaseRepository {
           )})`,
           eq(t.eventType, "flow:clicked"),
           sql`${t.buttonId} IS NOT NULL`,
+          sinceCondition(since),
         ),
       )
       .groupBy(t.nodeId, t.buttonId)

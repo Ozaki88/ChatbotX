@@ -46,6 +46,11 @@ import { resolveFolderIdFilter } from "../lib/folder-filter"
 import { assertDeletable } from "../template/installed-resource.service"
 import { assertAutomationAccount } from "./account-scope"
 
+export type CommentAutomationReplyFlowTrigger = Pick<
+  CommentAutomationModel,
+  "id" | "name" | "type" | "isActive" | "post" | "includeKeywords"
+>
+
 type ListFbCommentsInput = {
   workspaceId: string
   page?: number | null
@@ -1105,6 +1110,36 @@ class CommentAutomationService extends BaseService {
       ids: [input.id],
       types: [commentAutomationTypes.enum.messenger],
     })
+  }
+
+  /**
+   * The comment automations (any channel) whose private reply starts `flowId`:
+   * what the flow editor's trigger card lists as "When… user comments". A
+   * read for display only, so it returns the columns the card shows.
+   */
+  async listByReplyFlow(input: {
+    workspaceId: string
+    flowId: string
+  }): Promise<CommentAutomationReplyFlowTrigger[]> {
+    const t = commentAutomationModel
+    return await db
+      .select({
+        id: t.id,
+        name: t.name,
+        type: t.type,
+        isActive: t.isActive,
+        post: t.post,
+        includeKeywords: t.includeKeywords,
+      })
+      .from(t)
+      .where(
+        and(
+          eq(t.workspaceId, input.workspaceId),
+          sql`${t.privateReply}->>'type' = 'flow'`,
+          sql`${t.privateReply}->>'value' = ${input.flowId}`,
+        ),
+      )
+      .orderBy(t.createdAt)
   }
 
   async listIgComments(

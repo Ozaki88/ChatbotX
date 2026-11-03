@@ -10,6 +10,22 @@ export const flowStatsRequest = z.object({
 })
 export type FlowStatsRequest = z.infer<typeof flowStatsRequest>
 
+/**
+ * The stats read with its optional date range. Kept apart from
+ * `flowStatsRequest` so the reset (DELETE) route, which shares that schema,
+ * does not grow a request body.
+ */
+export const flowStatsRangeRequest = flowStatsRequest.extend({
+  since: z
+    .string()
+    .datetime()
+    .optional()
+    .describe(
+      "ISO 8601 instant. Only count events that occurred at or after it; omit for the whole analytics session.",
+    ),
+})
+export type FlowStatsRangeRequest = z.infer<typeof flowStatsRangeRequest>
+
 export const getFlowStatsResponse = z.object({
   "message:sent": z.number(),
   "message:delivered": z.number(),

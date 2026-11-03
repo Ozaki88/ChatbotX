@@ -50,6 +50,7 @@ type MessageStats = {
   deliveredPercent: number
   seenPercent: number
   sent: number
+  delivered: number
 }
 
 type StatDescriptor<TStats> = {
@@ -104,6 +105,7 @@ const getMessageStats = (analytics?: NodeResponse | null): MessageStats => {
 
   return {
     sent,
+    delivered,
     deliveredPercent: toPercent(delivered, sent),
     seenPercent: toPercent(seen, sent),
     clickedPercent: toPercent(clicked, sent),
@@ -212,7 +214,7 @@ export const NodeAnalyticsViewer = memo((props: NodeAnalyticsViewerProps) => {
 
         <FlowAnalyticsStoreProvider
           buttonStats={buttonStats}
-          totalSent={messageStats.sent}
+          delivered={messageStats.delivered}
         >
           <CardContent className="flex flex-col gap-4 p-4 pt-0">
             {"steps" in data.details &&

@@ -582,7 +582,9 @@ an endpoint's scope.
   `contactScans.list` accepts `integrationId` and `sort`. Analytics adds
   `GET /v1/analytics/flows/{flowId}/smart-delay-stats` (wait/follow-up
   `{waiting, sent}` per node of the draft version; kept apart from `flowStats`
-  so its shape does not change) and four comment-automation routes under
+  so its shape does not change; `flowStats` itself accepts an optional
+  `since` ISO instant to count only events from that moment, as the flow
+  editor's date range does) and four comment-automation routes under
   `/v1/analytics/comment-automation/*` (replies per day, customer comments, bot
   replies, errors). The customer comment texts are PII and are returned
   verbatim to any `analytics`-scoped token, as the dashboard shows them; the
