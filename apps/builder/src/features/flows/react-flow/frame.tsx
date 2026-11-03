@@ -8,6 +8,7 @@ import type { FlowResource } from "../schema/resource"
 import { ButtonEditorDialog } from "./button-editor-dialog"
 import { FlowCanvasStatsProvider } from "./canvas/flow-canvas-stats"
 import type { FlowTriggers } from "./canvas/flow-triggers"
+import { TriggerSheet, TriggerSheetProvider } from "./canvas/trigger-sheet"
 import { FrameHeader } from "./frame-header"
 import { NodeDetailSheet } from "./nodes/node-detail-sheet"
 import { ReactFlowWrapper } from "./react-flow-wrapper"
@@ -91,15 +92,22 @@ export function ReactFlowFrame({
       />
 
       <FlowCanvasStatsProvider flowId={flow.id} workspaceId={flow.workspaceId}>
-        <ReactFlowWrapper
-          flowVersion={flowVersion}
-          onAutosaveCancelChange={handleAutosaveCancelChange}
-          onAutosaveFlushChange={handleAutosaveFlushChange}
-          onDraftDirtiedChange={handleDraftDirtiedChange}
-          onMarkSavedChange={handleMarkSavedChange}
-          setOpenNodeDetailSheet={setOpenNodeDetailSheet}
-          triggers={triggers}
-        />
+        <TriggerSheetProvider>
+          <ReactFlowWrapper
+            flowVersion={flowVersion}
+            onAutosaveCancelChange={handleAutosaveCancelChange}
+            onAutosaveFlushChange={handleAutosaveFlushChange}
+            onDraftDirtiedChange={handleDraftDirtiedChange}
+            onMarkSavedChange={handleMarkSavedChange}
+            setOpenNodeDetailSheet={setOpenNodeDetailSheet}
+            triggers={triggers}
+          />
+          <TriggerSheet
+            flowId={flow.id}
+            flowName={flow.name}
+            workspaceId={flow.workspaceId}
+          />
+        </TriggerSheetProvider>
       </FlowCanvasStatsProvider>
 
       <NodeDetailSheet

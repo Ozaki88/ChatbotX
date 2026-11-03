@@ -5,6 +5,10 @@ import {
   commentAutomationService,
   flowService,
 } from "@chatbotx.io/business"
+import type {
+  CommentIncludeKeywords,
+  CommentReply,
+} from "@chatbotx.io/database/partials"
 
 /**
  * What starts a flow, for the trigger card at the left of the editor canvas:
@@ -27,6 +31,14 @@ export type FlowTrigger = {
   /** Button triggers only: the button's label. */
   buttonLabel: string | null
   href: string
+  /** Comment rules only: the stored match settings, edited by the trigger sheet. */
+  includeKeywords: CommentIncludeKeywords | null
+  /** Comment rules only: the public reply under the comment. */
+  publicReply: CommentReply | null
+  /** Comment rules on chosen posts: how many. */
+  postCount: number
+  /** Keyword rules only: the folder, carried through an update. */
+  folderId: string | null
 }
 
 export type FlowTriggers = {
@@ -78,6 +90,10 @@ export async function listFlowTriggers(input: {
         postScope: postScopeOf(rule.post),
         buttonLabel: null,
         href: `${base}/${COMMENT_RULE_PATHS[rule.type] ?? "fb-comments"}/${rule.id}`,
+        includeKeywords: rule.includeKeywords,
+        publicReply: rule.publicReply,
+        postCount: rule.post.type === "postIds" ? rule.post.value.length : 0,
+        folderId: null,
       }),
     ),
     ...keywordRules.map(
@@ -94,6 +110,10 @@ export async function listFlowTriggers(input: {
           rule.type === "inbound"
             ? `${base}/automated-responses/${rule.id}/edit`
             : `${base}/page-automated-responses/${rule.id}/edit`,
+        includeKeywords: null,
+        publicReply: null,
+        postCount: 0,
+        folderId: rule.folderId,
       }),
     ),
     ...buttons.map(
@@ -107,6 +127,10 @@ export async function listFlowTriggers(input: {
         postScope: null,
         buttonLabel: button.buttonLabel,
         href: `${base}/flows/${button.flowId}`,
+        includeKeywords: null,
+        publicReply: null,
+        postCount: 0,
+        folderId: null,
       }),
     ),
   ]

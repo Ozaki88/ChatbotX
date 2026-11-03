@@ -30,7 +30,7 @@ import type { PaginatedResult } from "../types"
 
 export type AutomatedResponseFlowTrigger = Pick<
   AutomatedResponseModel,
-  "id" | "type" | "keywords" | "status"
+  "id" | "type" | "keywords" | "status" | "folderId"
 >
 
 export type UpdateAutomatedResponseRequest = {
@@ -120,6 +120,7 @@ class AutomatedResponseService extends BaseService {
         type: t.type,
         keywords: t.keywords,
         status: t.status,
+        folderId: t.folderId,
       })
       .from(t)
       .where(

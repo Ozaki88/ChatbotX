@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import type { ComponentType, SVGProps } from "react"
 import type { FlowTrigger, FlowTriggers } from "./flow-triggers"
+import { useTriggerSheet } from "./trigger-sheet"
 
 /**
  * The ManyChat-style "When…" card at the left of the Start node: every
@@ -67,6 +68,7 @@ const triggerLineKey = (trigger: FlowTrigger) => {
 
 function TriggerRow({ trigger }: { trigger: FlowTrigger }) {
   const t = useTranslations()
+  const { openTrigger } = useTriggerSheet()
   const channel = CHANNEL_ICONS[trigger.channel]
   const Icon = channel?.Icon ?? MessageSquareTextIcon
 
@@ -83,14 +85,12 @@ function TriggerRow({ trigger }: { trigger: FlowTrigger }) {
     detail = t("flowCanvas.trigger.anyComment")
   }
 
-  return (
-    <Link
-      className={cn(
-        "group flex items-start gap-2.5 rounded-lg border bg-background px-3 py-2 transition-colors hover:border-primary/60 hover:bg-accent",
-        !trigger.isActive && "opacity-60",
-      )}
-      href={trigger.href}
-    >
+  const rowClassName = cn(
+    "group flex w-full items-start gap-2.5 rounded-lg border bg-background px-3 py-2 text-start transition-colors hover:border-primary/60 hover:bg-accent",
+    !trigger.isActive && "opacity-60",
+  )
+  const body = (
+    <>
       <span
         className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md"
         style={{
@@ -121,7 +121,23 @@ function TriggerRow({ trigger }: { trigger: FlowTrigger }) {
         )}
       </span>
       <SquarePenIcon className="mt-1 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+    </>
+  )
+
+  // A button of another flow opens that flow; a rule opens its compact
+  // settings in the sheet beside the canvas.
+  return trigger.kind === "button" ? (
+    <Link className={rowClassName} href={trigger.href}>
+      {body}
     </Link>
+  ) : (
+    <button
+      className={rowClassName}
+      onClick={() => openTrigger(trigger)}
+      type="button"
+    >
+      {body}
+    </button>
   )
 }
 

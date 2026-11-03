@@ -48,7 +48,13 @@ import { assertAutomationAccount } from "./account-scope"
 
 export type CommentAutomationReplyFlowTrigger = Pick<
   CommentAutomationModel,
-  "id" | "name" | "type" | "isActive" | "post" | "includeKeywords"
+  | "id"
+  | "name"
+  | "type"
+  | "isActive"
+  | "post"
+  | "includeKeywords"
+  | "publicReply"
 >
 
 type ListFbCommentsInput = {
@@ -1130,6 +1136,7 @@ class CommentAutomationService extends BaseService {
         isActive: t.isActive,
         post: t.post,
         includeKeywords: t.includeKeywords,
+        publicReply: t.publicReply,
       })
       .from(t)
       .where(
