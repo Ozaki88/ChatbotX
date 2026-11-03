@@ -35,6 +35,19 @@ export const FREYA_STATS_CHANNELS = {
 } as const
 export type FreyaStatsChannel = keyof typeof FREYA_STATS_CHANNELS
 
+/**
+ * The three gifts the "YES" opener offers. Each button tags the person with its
+ * tag, so a pick is "this contact carries the tag". The tag table has no
+ * timestamp, so the pick is credited to the reel of the DM whose button they
+ * tapped (`clickedAt`), else to their latest DM.
+ */
+export const FREYA_PICKS = [
+  { key: "jupi", label: "Jupi", tag: "picked-jupi" },
+  { key: "gummies", label: "Gummies", tag: "picked-gummies" },
+  { key: "book", label: "Book", tag: "picked-book" },
+] as const
+export type FreyaPickKey = (typeof FREYA_PICKS)[number]["key"]
+
 export type FreyaStatsFilter = {
   workspaceId: string
   range: FreyaStatsRange
@@ -109,6 +122,48 @@ function allCommentsCte(filter: FreyaStatsFilter): SQL {
     )`
 }
 
+/**
+ * `picks(postId, tag)`: one row per person who tapped a gift button, credited
+ * to a single reel. Must follow a CTE named `ev` (events in range).
+ */
+function picksCte(filter: FreyaStatsFilter): SQL {
+  return sql`
+    attributed AS (
+      SELECT DISTINCT ON (ev."contactId") ev."contactId", ev."postId"
+      FROM ev
+      WHERE ev."replyChannel" = 'private' AND ev."contactId" IS NOT NULL
+      ORDER BY ev."contactId", ev."clickedAt" DESC NULLS LAST, ev."occurredAt" DESC
+    ),
+    picks AS (
+      SELECT at."postId", t."name" AS "tag"
+      FROM attributed at
+      JOIN "ContactToTag" ct ON ct."contactId" = at."contactId"
+      JOIN "Tag" t ON t."id" = ct."tagId"
+      WHERE t."workspaceId" = ${filter.workspaceId}
+        AND t."name" IN (${sql.join(
+          FREYA_PICKS.map((p) => sql`${p.tag}`),
+          sql`, `,
+        )})
+    )`
+}
+
+function pickCounts(r: Row): Record<FreyaPickKey, number> {
+  return Object.fromEntries(
+    FREYA_PICKS.map((p) => [p.key, num(r[`pick_${p.key}`])]),
+  ) as Record<FreyaPickKey, number>
+}
+
+/** `COUNT(*) FILTER (...) AS "pick_<key>"` for each gift, over `picks`. */
+function pickColumns(postMatch: SQL): SQL {
+  return sql.join(
+    FREYA_PICKS.map(
+      (p) =>
+        sql`(SELECT COUNT(*) FROM picks WHERE picks."tag" = ${p.tag}${postMatch}) AS ${sql.identifier(`pick_${p.key}`)}`,
+    ),
+    sql`, `,
+  )
+}
+
 function safeTimezone(timezone: string): string {
   const canonical = canonicalizeTimezone(timezone)
   return isValidTimezone(canonical) ? canonical : "UTC"
@@ -147,6 +202,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
     links,
     linkTotals,
     linkDaily,
+    pickTotals,
   ] = await Promise.all([
     run(
       "totals",
@@ -243,6 +299,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       sql`
       ${allCommentsCte(filter)},
       ev AS (SELECT e.* ${eventsWhere(filter)}),
+      ${picksCte(filter)},
       per_post AS (
         SELECT c."postId", MIN(c."type") AS "type",
           COUNT(*) AS "comments",
@@ -256,6 +313,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       SELECT p.*,
         (SELECT COUNT(*) FROM ev WHERE ev."postId" = p."postId" AND ev."replyChannel" = 'private' AND ev."status" = 'sent') AS "dmSent",
         (SELECT COUNT(*) FROM ev WHERE ev."postId" = p."postId" AND ev."clickedAt" IS NOT NULL) AS "tapped",
+        ${pickColumns(sql` AND picks."postId" = p."postId"`)},
         cp."caption", cp."thumbnail", cp."permalink"
       FROM per_post p
       LEFT JOIN LATERAL (
@@ -374,6 +432,13 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       WHERE "workspaceId" = ${filter.workspaceId} AND "occurredAt" >= ${from}
       GROUP BY 1`,
     ),
+    run(
+      "picks",
+      sql`
+      WITH ev AS (SELECT e.* ${eventsWhere(filter)}),
+      ${picksCte(filter)}
+      SELECT ${pickColumns(sql``)}`,
+    ),
   ])
 
   // Post thumbnails are stored as paths in ChatbotX's own file storage.
@@ -405,6 +470,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       linkPeople: num(linkTotals[0]?.people),
       newContacts: num(newContacts[0]?.count),
     },
+    picks: pickCounts(pickTotals[0] ?? {}),
     daily: daily.map((r) => ({
       day: String(r.day),
       answeredComments: num(r.answeredComments),
@@ -443,6 +509,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
       answered: num(r.answered),
       dmSent: num(r.dmSent),
       tapped: num(r.tapped),
+      picks: pickCounts(r),
       caption: r.caption ? String(r.caption) : null,
       thumbnail: r.thumbnail ? fileUrl(String(r.thumbnail)) : null,
       permalink: r.permalink ? String(r.permalink) : null,
@@ -508,7 +575,7 @@ export async function getFreyaStats(filter: FreyaStatsFilter) {
 function explainFailure(detail: string): string | null {
   const d = detail.toLowerCase()
   if (d.includes("already has a reply") || d.includes("already replied")) {
-    return "Repeat commenter: they already got a DM for an earlier comment on this post, and Instagram allows one DM per person per post. They now get the \"DM me YES\" reply instead."
+    return 'Repeat commenter: they already got a DM for an earlier comment on this post, and Instagram allows one DM per person per post. They now get the "DM me YES" reply instead.'
   }
   if (d.includes("1893063") || d.includes("temporarily restricted")) {
     return "Meta has temporarily blocked this Page from messaging (too many identical DMs in a short time). It lifts on its own after a few days."
@@ -516,7 +583,11 @@ function explainFailure(detail: string): string | null {
   if (d.includes("2534001") || d.includes("thread does not exist")) {
     return "This person deleted the chat or can't be messaged by the Page."
   }
-  if (d.includes("1893062") || d.includes("1893049") || d.includes("cant reply")) {
+  if (
+    d.includes("1893062") ||
+    d.includes("1893049") ||
+    d.includes("cant reply")
+  ) {
     return "This commenter is a Page, not a person, so no DM is possible."
   }
   return null

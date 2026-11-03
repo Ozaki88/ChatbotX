@@ -6,6 +6,7 @@ import { AnalyticsNav } from "@/features/analytics/components/analytics-nav"
 import { resolveAdsDashboardChannels } from "@/features/analytics/lib/ads-dashboard-channels"
 import { resolveGoogleAdsDashboardEntry } from "@/features/analytics/lib/google-ads-dashboard-entry"
 import {
+  FREYA_PICKS,
   FREYA_STATS_CHANNELS,
   FREYA_STATS_RANGES,
   type FreyaStats,
@@ -175,6 +176,24 @@ export default async function FreyaStatsPage({
             </Section>
           </div>
         </div>
+
+        <Section
+          hint="Gift buttons people tapped in the YES message (tags picked-jupi, picked-gummies, picked-book). The Per post table shows which reel each pick came from."
+          title="What people pick"
+        >
+          <BarList
+            empty="No picks yet."
+            items={
+              FREYA_PICKS.some((p) => stats.picks[p.key] > 0)
+                ? FREYA_PICKS.map((p, i) => ({
+                    label: p.label,
+                    value: stats.picks[p.key],
+                    color: [SAGE, HONEY, SAGE_SOFT][i] ?? SAGE,
+                  }))
+                : []
+            }
+          />
+        </Section>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="xl:col-span-2">
@@ -746,7 +765,16 @@ function PostsTable({ rows }: { rows: FreyaStats["posts"] }) {
   }
   return (
     <Table
-      head={["Post", "Channel", "Comments", "Answered", "DMs", "Taps", "Last"]}
+      head={[
+        "Post",
+        "Channel",
+        "Comments",
+        "Answered",
+        "DMs",
+        "Taps",
+        ...FREYA_PICKS.map((p) => p.label),
+        "Last",
+      ]}
     >
       {rows.map((r) => {
         const link = postLink(r)
@@ -793,6 +821,11 @@ function PostsTable({ rows }: { rows: FreyaStats["posts"] }) {
             </td>
             <td className={td}>{r.dmSent}</td>
             <td className={td}>{r.tapped}</td>
+            {FREYA_PICKS.map((p) => (
+              <td className={td} key={p.key}>
+                {r.picks[p.key] || "—"}
+              </td>
+            ))}
             <td className={`${td} whitespace-nowrap`}>
               {r.lastComment?.toLocaleDateString() ?? "—"}
             </td>
