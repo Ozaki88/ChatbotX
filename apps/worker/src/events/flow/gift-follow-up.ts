@@ -11,23 +11,27 @@ import {
 import { logger } from "../../lib/logger"
 
 /**
- * Freya fork: two follow-ups after someone picks a YES gift.
+ * Freya fork: follow-ups after someone picks a YES gift.
  *
- * - 3h: they have not opened the product link yet → a short reason to buy
- *   their gift, with the link again.
+ * - 2h: they have not opened the product link yet → Freya asks why they
+ *   picked it; each answer button leads to a matching sales message.
+ * - 6h: still no click → a short reason to buy, with the link again.
  * - 20h: they did open it → "did you get a look?" plus one other product.
  *
- * The tap opened Meta's 24-hour window, so both stay inside it. Each job
- * decides at send time (clicked or not), so nobody gets both. The messages
- * live in the flow named `GIFT_FOLLOW_UP_FLOW_NAME`, one node per stage and
- * gift, named "3h · jupi", "20h · book" and so on; the gift is read from the
- * tapped button's `picked-<gift>` tag. No such flow or node → nothing is sent.
+ * The tap opened Meta's 24-hour window, so all stay inside it. Each job
+ * decides at send time (clicked or not). The messages live in the flow named
+ * `GIFT_FOLLOW_UP_FLOW_NAME`, one node per stage and gift, named "2h · jupi",
+ * "20h · book" and so on; the gift is read from the tapped button's
+ * `picked-<gift>` tag. No such flow or node → nothing is sent.
  */
 export const GIFT_FOLLOW_UP_FLOW_NAME = "Gift follow-ups"
 
+const HOUR_MS = 60 * 60 * 1000
+
 const STAGE_DELAY_MS = {
-  "3h": 3 * 60 * 60 * 1000,
-  "20h": 20 * 60 * 60 * 1000,
+  "2h": 2 * HOUR_MS,
+  "6h": 6 * HOUR_MS,
+  "20h": 20 * HOUR_MS,
 } as const
 
 /** Margin under Meta's 24 hours, in case the job runs late. */
@@ -53,7 +57,7 @@ export async function scheduleGiftFollowUps(
   const tappedAt = new Date(payload.occurredAt)
   const day = tappedAt.toISOString().slice(0, 10)
 
-  for (const stage of ["3h", "20h"] as const) {
+  for (const stage of ["2h", "6h", "20h"] as const) {
     const data: GiftFollowUpData = {
       stage,
       workspaceId: context.workspaceId,
@@ -84,17 +88,15 @@ export async function runGiftFollowUp(data: GiftFollowUpData): Promise<void> {
     return
   }
 
-  const tappedVersion = await flowVersionService.findForButtonPayload({
-    flowId: data.flowId,
-    workspaceId: data.workspaceId,
-  })
-  const gift = findPickedGift(tappedVersion?.nodes, data.buttonId)
+  const gift = await findTappedGift(data)
   if (!gift) {
     return
   }
 
   const clicked = await hasClickedSince(data.contactId, data.tappedAt)
-  if ((data.stage === "3h") === clicked) {
+  // Only the 20h cross-sell is for people who clicked; the rest are for those
+  // who have not yet.
+  if ((data.stage === "20h") !== clicked) {
     logger.info(
       { ...log, gift, clicked },
       "[gift-follow-up] does not apply, skipping",
@@ -156,6 +158,19 @@ type LooseNode = {
 
 const asNodes = (nodes: unknown): LooseNode[] =>
   Array.isArray(nodes) ? (nodes as LooseNode[]) : []
+
+/** The gift a tapped button picks, e.g. "jupi"; undefined for other buttons. */
+export async function findTappedGift(props: {
+  flowId: string
+  workspaceId: string
+  buttonId: string
+}): Promise<string | undefined> {
+  const version = await flowVersionService.findForButtonPayload({
+    flowId: props.flowId,
+    workspaceId: props.workspaceId,
+  })
+  return findPickedGift(version?.nodes, props.buttonId)
+}
 
 /** "jupi" for a button that tags `picked-jupi`, else undefined. */
 function findPickedGift(nodes: unknown, buttonId: string): string | undefined {

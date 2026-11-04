@@ -381,7 +381,8 @@ export type ScheduleJobFreyaMorningSummary = {
 export type ScheduleJobFreyaGiftFollowUp = {
   type: typeof ScheduleJobData.freyaGiftFollowUp
   data: {
-    stage: "3h" | "20h"
+    // "3h" only for jobs queued before the 2h/6h split.
+    stage: "2h" | "3h" | "6h" | "20h"
     workspaceId: string
     contactId: string
     contactInboxId: string

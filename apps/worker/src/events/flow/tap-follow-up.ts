@@ -9,19 +9,18 @@ import type { FlowClickedPayload } from "@chatbotx.io/flow-config"
 import { applySpintax } from "@chatbotx.io/utils/spintax"
 import { ChatJobAction, chatQueue } from "@chatbotx.io/worker-config"
 import { logger } from "../../lib/logger"
-import { scheduleGiftFollowUps } from "./gift-follow-up"
+import { findTappedGift, scheduleGiftFollowUps } from "./gift-follow-up"
 
 /**
  * Freya fork: one nudge after a comment-DM button is tapped.
  *
  * A tap is the person acting, which opens Meta's 24-hour window, so a second
- * message is allowed. It leaves 20 minutes later, by which time they have
- * either opened the link or forgotten the thread; ManyChat reports about a
- * third more link clicks from exactly this nudge. One per person per day,
- * enforced by the job id, and only for taps that came from a comment
- * automation.
+ * message is allowed. It leaves 2 hours later (20 minutes felt pushy to the
+ * user). One per person per day, enforced by the job id, and only for taps
+ * that came from a comment automation. A YES gift tap gets the gift
+ * follow-ups instead (see `gift-follow-up.ts`), which start with a question.
  */
-export const TAP_FOLLOW_UP_DELAY_MS = 20 * 60 * 1000
+export const TAP_FOLLOW_UP_DELAY_MS = 2 * 60 * 60 * 1000
 
 export const TAP_FOLLOW_UP_TEXT =
   "{Did the link open for you, honey? 💛|Just checking the link worked for you, sugar 💛|Let me know if the link gave you any trouble, honey 💛} If not, reply LINK and I'll send it again."
@@ -43,13 +42,23 @@ export async function scheduleTapFollowUps(
       continue
     }
     try {
+      const gift =
+        payload.action.buttonId &&
+        (await findTappedGift({
+          flowId: payload.action.flowId,
+          workspaceId: payload.context.workspaceId,
+          buttonId: payload.action.buttonId,
+        }))
+      if (gift) {
+        await scheduleGiftFollowUps(payload)
+        continue
+      }
       await scheduleOne({
         workspaceId: payload.context.workspaceId,
         contactId: payload.context.contactId,
         contactInboxId: payload.context.contactInboxId,
         occurredAt: payload.occurredAt,
       })
-      await scheduleGiftFollowUps(payload)
     } catch (err) {
       logger.warn(
         { err, contactInboxId: payload.context.contactInboxId },
