@@ -39,16 +39,43 @@ export const GET = async (
     return NextResponse.json({ message: "Not found" }, { status: 404 })
   }
 
-  let destination: string
-  try {
-    destination = interpolate(row.url, {
+  const resolveUrl = (url: string) =>
+    interpolate(url, {
       ...Object.fromEntries(request.nextUrl.searchParams.entries()),
     })
+
+  let destination: string
+  try {
+    destination = resolveUrl(row.url)
   } catch {
     return NextResponse.json(
       { message: "Invalid link configuration" },
       { status: 400 },
     )
+  }
+
+  /**
+   * Freya fork: a sibling magic link named `<name>-<channel>` (for example
+   * `jupi-amazon-messenger`) overrides the destination for contacts on that
+   * channel, so Facebook and Instagram DMs can carry different affiliate links
+   * behind one button. Clicks are still recorded on the base link.
+   */
+  const channelDestination = async (channel?: string) => {
+    if (!channel) {
+      return destination
+    }
+    const override = await magicLinkService.findByName({
+      workspaceId,
+      name: `${name}-${channel}`,
+    })
+    if (!override) {
+      return destination
+    }
+    try {
+      return resolveUrl(override.url)
+    } catch {
+      return destination
+    }
   }
 
   /**
@@ -59,6 +86,7 @@ export const GET = async (
    * blank page inside Messenger's webview.
    */
   const redirectToDestination = async (channel?: string) => {
+    destination = await channelDestination(channel)
     if (!matchDeepLinkApp(destination)) {
       return NextResponse.redirect(destination, 302)
     }
